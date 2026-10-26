@@ -667,7 +667,7 @@ function insights(P, A) {
   });
   agrupar(rvPos, p => grupoDe(setorDe(p.ticker))).filter(x => x.classes.size >= 2 && x.valor / total >= 0.08 && !x.nome.startsWith("Índice"))
     .forEach(x => out.push(["info", "▦", `${x.nome} soma ${pctAbs(x.valor / total * 100, 0)} da carteira, espalhado entre ${[...x.classes].join(" e ")}`,
-      `${x.tickers.slice(0, 6).map(([t, v]) => `${t} ${pctAbs(v / total * 100)}`).join(", ")}. Olhando classe por classe essa concentração não aparece.`, 0.44]));
+      `${Object.entries(x.pc).map(([c, v]) => `${pctAbs(v / total * 100)} em ${c}`).join(" + ")}: separada por classe, cada parte parece pequena, mas é o mesmo setor e tende a subir ou cair junto. ${x.tickers.slice(0, 6).map(([t, v]) => `${t} ${pctAbs(v / total * 100)}`).join(", ")}.`, 0.44]));
   const sem = [...new Set(rvPos.filter(p => !SETOR[p.ticker]).map(p => p.ticker))];
   if (sem.length) out.push(["info", "?", `${sem.length} ativo(s) sem setor`, `${sem.join(", ")}: classifique em dados/setores.json para entrarem na análise de concentração.`, 0.1]);
   const quebradas = checarRegras(P, alvoEfetivo()).lista;
