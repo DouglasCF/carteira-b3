@@ -1,8 +1,24 @@
-# dados financeiros pessoais ficam só nesta máquina
+# Dados financeiros pessoais: nunca versionar
 dados/
 cache/
-relatorios/data.js
-relatorios/arquivo/
+relatorios/*
+!relatorios/dashboard.html
+
+# Defesa extra: planilhas, PDFs e exports soltos em qualquer pasta
+*.xlsx
+*.xls
+*.csv
+*.pdf
+*.json
+!package.json
+
+# Segredos e config local
+.env
+.env.*
+.claude/settings.local.json
+
+# Ambiente
 .venv/
 __pycache__/
+*.pyc
 .DS_Store
