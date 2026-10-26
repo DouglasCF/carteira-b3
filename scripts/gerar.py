@@ -17,13 +17,9 @@ import json
 import sys
 from collections import defaultdict
 from datetime import date
-from pathlib import Path
 
 import mercado
-
-ROOT = Path(__file__).resolve().parent.parent
-DIR_MENSAL = ROOT / "dados" / "mensal"
-SAIDA = ROOT / "relatorios" / "data.js"
+from config import DIR_MENSAL, SAIDA
 
 BENCH_CLASSE = {
     "Ações Brasil": "Ibovespa",
@@ -202,6 +198,7 @@ def main():
         if abs(q) > EPS:
             todos_avisos.append(f"{k[3:]}: {q:+g} unidades negociadas ainda não aparecem na posição (liquidação no próximo mês?)")
     data = {"gerado_em": date.today().isoformat(), "meses": saida, "benchmarks": bench, "bench_classe": BENCH_CLASSE}
+    SAIDA.parent.mkdir(parents=True, exist_ok=True)
     SAIDA.write_text("window.DATA = " + json.dumps(data, ensure_ascii=False) + ";\n")
 
     for m in saida[1:]:

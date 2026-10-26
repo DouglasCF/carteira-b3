@@ -241,7 +241,7 @@ const mesLabel = m => { const [a, n] = m.split("-"); return `${MES_NOME[n - 1]}/
 const mesLongo = m => { const [a, n] = m.split("-"); return `${MES_NOME[n - 1]} ${a}`; };
 const dataBR = s => s ? s.split("-").reverse().join("/") : "—";
 const soma = (arr, f = x => x) => arr.reduce((s, x) => s + f(x), 0);
-const cadeia = rs => (rs.reduce((f, r) => f * (1 + (r ?? 0) / 100), 1) - 1) * 100;
+const cadeia = rs => !rs.length || rs.every(r => r == null) ? null : (rs.reduce((f, r) => f * (1 + (r ?? 0) / 100), 1) - 1) * 100;
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 const MESES = D.meses;
@@ -262,7 +262,9 @@ function periodo() {
   const meses = MESES.slice(est.ini, est.fim + 1);
   const base = MESES[est.ini - 1];
   const fim = MESES[est.fim];
-  const bench = Object.fromEntries(Object.entries(D.benchmarks).map(([k, s]) => [k, meses.map(m => s[m.mes] ?? null)]));
+  // índice que não veio (offline, Yahoo fora do ar) vira série vazia em vez de quebrar a página
+  const nomes = new Set([...Object.keys(D.benchmarks || {}), ...BENCH.slice(1).map(([n]) => n)]);
+  const bench = Object.fromEntries([...nomes].map(k => [k, meses.map(m => (D.benchmarks?.[k] || {})[m.mes] ?? null)]));
   return { meses, base, fim, bench, todos: MESES.slice(est.ini - 1, est.fim + 1) };
 }
 

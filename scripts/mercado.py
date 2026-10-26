@@ -8,9 +8,8 @@ import sys
 import time
 import urllib.request
 from datetime import date, datetime, timezone
-from pathlib import Path
 
-CACHE = Path(__file__).resolve().parent.parent / "cache"
+from config import CACHE, SEM_MERCADO
 UA = {"User-Agent": "Mozilla/5.0"}
 
 
@@ -81,7 +80,7 @@ def fechamentos(symbol, inicio, fim):
 
 def benchmarks(meses):
     """{'CDI': {'AAAA-MM': retorno_mensal_%}, ...} para cada mês da lista."""
-    if not meses:
+    if not meses or SEM_MERCADO:
         return {}
     ini, fim = meses[0], meses[-1]
     base = _mes_anterior(ini)  # nível do mês anterior para calcular a variação do primeiro

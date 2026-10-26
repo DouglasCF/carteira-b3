@@ -22,3 +22,6 @@ relatorios/*
 __pycache__/
 *.pyc
 .DS_Store
+
+# Carteira fictícia gerada por scripts/exemplo.py
+exemplo/

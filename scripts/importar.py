@@ -14,10 +14,7 @@ from datetime import date
 from pathlib import Path
 
 import b3
-
-ROOT = Path(__file__).resolve().parent.parent
-DIR_B3 = ROOT / "dados" / "b3"
-DIR_MENSAL = ROOT / "dados" / "mensal"
+from config import DIR_B3, DIR_MENSAL
 PADRAO = "relatorio-consolidado-*.xlsx"
 
 
