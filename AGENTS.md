@@ -1,4 +1,4 @@
-# Investimentos
+# Carteira B3
 
 Dashboard pessoal de carteira gerado a partir dos relatórios consolidados mensais da B3. Uso e estrutura: `README.md`. Atualização mensal: skill `atualizar-carteira`. A fonte da skill fica em `.agents/skills/`; `.claude`, `.cursor`, `.codex` e `.agent` apontam para ela via symlink, assim como `CLAUDE.md` aponta para este arquivo.
 

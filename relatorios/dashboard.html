@@ -724,6 +724,8 @@ function render() {
   renderTree(P); renderContrib(P); renderProv(P); renderMeses(P); renderMov(P); renderAlerts(P); renderPos(P);
 }
 function init() {
+  const temaUrl = new URLSearchParams(location.search).get("tema");  // ?tema=light|dark (screenshots)
+  if (temaUrl === "light" || temaUrl === "dark") document.documentElement.dataset.theme = temaUrl;
   if (!D || MESES.length < 2) {
     document.querySelector("main").innerHTML = "<p>Sem dados. Rode <code>scripts/importar.py</code> e <code>scripts/gerar.py</code>.</p>";
     return;

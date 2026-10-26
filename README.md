@@ -1,6 +1,13 @@
-# Investimentos
+# Carteira B3
 
 Dashboard local da sua carteira a partir dos **relatórios consolidados mensais da B3** (Área do Investidor). Mostra patrimônio, aportes, rentabilidade mês a mês contra CDI/Ibovespa/IPCA/IFIX/S&P 500, composição, proventos e movimentações, com seleção de período.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/dashboard-dark.png">
+  <img alt="Dashboard com uma carteira fictícia: patrimônio, evolução por tipo de ativo, rentabilidade mês a mês e acumulada contra benchmarks" src="docs/dashboard-light.png">
+</picture>
+
+<sub>Carteira fictícia gerada por <code>scripts/exemplo.py</code>.</sub>
 
 Tudo roda na sua máquina: as planilhas, os dados normalizados e o dashboard gerado ficam fora do git.
 
