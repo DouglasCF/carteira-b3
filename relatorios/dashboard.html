@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carteira de Investimentos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.1/dist/chartjs-chart-treemap.min.js"></script>
+<script src="data.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f3f2ee;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
+  --pos:#2a78d6; --neg:#e34948;
+  --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b; --good-text:#006300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+    --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    --pos:#3987e5; --neg:#e66767; --good-text:#0ca30c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+  --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --pos:#3987e5; --neg:#e66767; --good-text:#0ca30c;
+}
+* { box-sizing: border-box; }
+body { margin:0; background:var(--page); color:var(--ink); font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; }
+main { max-width: 1240px; margin: 0 auto; padding: 0 16px 64px; }
+header { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; padding: 24px 0 12px; }
+h1 { font-size: 24px; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 16px; margin: 0 0 4px; }
+.sub { color: var(--ink-2); margin: 2px 0 0; }
+.hint { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+button, select, input { font: inherit; color: var(--ink); background: var(--surface); border:1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+button { cursor: pointer; }
+button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.periodo { position: sticky; top: 0; z-index: 5; background: var(--page); padding: 10px 0; margin-bottom: 8px; border-bottom: 1px solid var(--border); display:flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.periodo .grp { display:flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.periodo label { color: var(--ink-2); font-size: 12px; }
+.periodo .resumo { color: var(--ink-2); font-size: 12px; margin-left: auto; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.grid { display: grid; gap: 16px; margin-bottom: 16px; }
+.g-tiles { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.g-2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 500px), 1fr)); }
+.tile .label { color: var(--ink-2); font-size: 12px; }
+.tile .value { font-size: 26px; font-weight: 600; margin-top: 4px; }
+.tile .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.up { color: var(--good-text); } .down { color: var(--critical); }
+.chart { position: relative; }
+.row { display:flex; gap: 8px; align-items:center; flex-wrap: wrap; margin-bottom: 8px; }
+.row .spacer { flex: 1; }
+.seg { display:inline-flex; gap: 4px; }
+.seg button { padding: 4px 10px; font-size: 12px; }
+.legend { display:flex; flex-wrap:wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin: 4px 0 10px; }
+.legend span { cursor: default; }
+.legend button { border: 0; background: none; padding: 0; color: var(--ink-2); font-size: 12px; }
+.legend button[aria-pressed="false"] { opacity: .4; }
+.legend i { display:inline-block; width:10px; height:10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.alerts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.alerts li { display:flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); }
+.alerts .ic { flex: none; width: 22px; height: 22px; border-radius: 50%; display:grid; place-items:center; font-weight:700; font-size:13px; color:#fff; }
+.alerts .critical .ic { background: var(--critical); }
+.alerts .serious .ic { background: var(--serious); }
+.alerts .warning .ic { background: var(--warning); color:#0b0b0b; }
+.alerts .info .ic { background: var(--muted); }
+.alerts small { color: var(--ink-2); display:block; }
+.tbl-wrap { overflow: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 7px 8px; border-bottom: 1px solid var(--grid); text-align: left; white-space: nowrap; }
+td.wrap { white-space: normal; min-width: 180px; max-width: 340px; }
+th { color: var(--ink-2); font-weight: 600; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+th[data-sort] { cursor: pointer; user-select: none; }
+th[data-sort]::after { content: " ↕"; color: var(--muted); }
+th.asc::after { content: " ↑"; color: var(--ink); } th.desc::after { content: " ↓"; color: var(--ink); }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+tr.click { cursor: pointer; } tr.click:hover td { background: var(--surface-2); }
+tr.sel td { background: var(--surface-2); font-weight: 600; }
+tr.total td { font-weight: 600; border-top: 1px solid var(--axis); }
+.dot { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:6px; }
+.pill { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--ink-2); }
+footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+footer li { margin-bottom: 4px; }
+@media (max-width: 600px) { .tile .value { font-size: 22px; } .periodo .resumo { margin-left: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Carteira de investimentos</h1>
+      <p class="sub" id="subtitulo"></p>
+    </div>
+    <button id="tema" type="button" aria-label="Alternar tema claro/escuro">◐ Tema</button>
+  </header>
+
+  <nav class="periodo" aria-label="Período">
+    <div class="grp seg" id="presets">
+      <button type="button" data-preset="mes">Último mês</button>
+      <button type="button" data-preset="ano">No ano</button>
+      <button type="button" data-preset="12m">12 meses</button>
+      <button type="button" data-preset="tudo">Tudo</button>
+    </div>
+    <div class="grp"><label for="fAno">Ano</label><select id="fAno"></select></div>
+    <div class="grp"><label for="fIni">De</label><select id="fIni"></select><label for="fFim">até</label><select id="fFim"></select></div>
+    <span class="resumo" id="periodoTxt"></span>
+  </nav>
+
+  <section class="grid g-tiles" id="tiles"></section>
+
+  <section class="card" style="margin-bottom:16px">
+    <div class="row">
+      <div><h2>Evolução do patrimônio</h2><p class="hint" style="margin:0">Fim de cada mês, por tipo de ativo. A linha tracejada é quanto você colocou (patrimônio inicial + aportes líquidos): a distância até o topo é o que o dinheiro rendeu.</p></div>
+      <span class="spacer"></span>
+      <div class="seg"><button type="button" data-evo="brl" aria-pressed="true">R$</button><button type="button" data-evo="pct" aria-pressed="false">% da carteira</button></div>
+    </div>
+    <div class="legend" id="lgEvo"></div>
+    <div class="chart" style="height:340px"><canvas id="cEvo"></canvas></div>
+  </section>
+
+  <section class="grid g-2">
+    <div class="card">
+      <h2>Rentabilidade mês a mês</h2>
+      <p class="hint">Barras: sua carteira. Marcador: CDI do mês.</p>
+      <div class="legend" id="lgMes"></div>
+      <div class="chart" style="height:280px"><canvas id="cMes"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Acumulado no período</h2>
+      <p class="hint">Clique na legenda para mostrar ou esconder uma linha.</p>
+      <div class="legend" id="lgAcum"></div>
+      <div class="chart" style="height:280px"><canvas id="cAcum"></canvas></div>
+    </div>
+  </section>
+
+  <section class="grid g-2">
+    <div class="card">
+      <h2>Desempenho por tipo de ativo</h2>
+      <p class="hint">Rentabilidade no período contra o benchmark de cada classe.</p>
+      <div class="tbl-wrap"><table id="tClasse"></table></div>
+    </div>
+    <div class="card">
+      <h2>De onde veio o ganho</h2>
+      <p class="hint">Ganho em R$ de cada tipo de ativo, mês a mês (inclui proventos).</p>
+      <div class="legend" id="lgGanho"></div>
+      <div class="chart" style="height:280px"><canvas id="cGanho"></canvas></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:16px">
+    <h2>Composição no fim do período</h2>
+    <p class="hint">Área proporcional ao valor. Passe o mouse para ver cada ativo; clique para filtrar a tabela de posições.</p>
+    <div class="legend" id="lgTree"></div>
+    <div class="chart" style="height:420px"><canvas id="cTree"></canvas></div>
+  </section>
+
+  <section class="grid g-2">
+    <div class="card">
+      <div class="row">
+        <div><h2>Quem mais ajudou e atrapalhou</h2><p class="hint" style="margin:0">Ganho no período por ativo, em R$ (preço + proventos, já descontados aportes).</p></div>
+      </div>
+      <div class="chart" id="contribWrap"><canvas id="cContrib"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Proventos</h2>
+      <p class="hint" id="provHint"></p>
+      <div class="legend" id="lgProv"></div>
+      <div class="chart" style="height:220px"><canvas id="cProv"></canvas></div>
+      <h2 style="margin-top:16px">Maiores pagadores no período</h2>
+      <div class="tbl-wrap" style="max-height:220px"><table id="tProv"></table></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:16px">
+    <h2>Resumo mês a mês</h2>
+    <p class="hint">Clique num mês para ver só ele.</p>
+    <div class="tbl-wrap"><table id="tMeses"></table></div>
+  </section>
+
+  <section class="grid g-2">
+    <div class="card">
+      <div class="row"><h2 style="margin:0">Movimentações</h2><span class="spacer"></span><select id="fMov" aria-label="Tipo de movimentação"></select></div>
+      <p class="hint">Compras e vendas vêm da B3. Aplicações, resgates e vencimentos de renda fixa são deduzidos comparando os meses.</p>
+      <div class="tbl-wrap" style="max-height:360px"><table id="tMov"></table></div>
+    </div>
+    <div class="card">
+      <h2>Pontos de atenção</h2>
+      <p class="hint">Na posição do fim do período.</p>
+      <ul class="alerts" id="alerts"></ul>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <h2 style="margin:0">Posições</h2>
+      <span class="pill" id="filtroPill" hidden></span>
+      <span class="spacer"></span>
+      <input id="busca" type="search" placeholder="Buscar ativo…" aria-label="Buscar ativo">
+      <select id="fClasse" aria-label="Classe"></select>
+      <select id="fInst" aria-label="Instituição"></select>
+    </div>
+    <div class="tbl-wrap" style="max-height:600px"><table id="tPos"></table></div>
+  </section>
+
+  <footer><ul id="notas"></ul></footer>
+</main>
+
+<script>
+const D = window.DATA;
+const CLASSES = ["Ações Brasil", "BDRs (ações globais)", "ETFs", "FIIs", "Renda fixa (CDB/LCA)", "Tesouro Direto", "Crédito privado"];
+const LISTADAS = CLASSES.slice(0, 4);
+const BENCH = [["Carteira", "--ink"], ["CDI", "--s6"], ["Ibovespa", "--s1"], ["IPCA", "--s4"], ["IFIX", "--s5"], ["S&P 500 (R$)", "--s2"], ["Dólar", "--s7"]];
+const TIPOS_PROV = ["Rendimento", "Dividendo", "Juros Sobre Capital Próprio", "Reembolso"];
+const MES_NOME = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const corClasse = c => { const i = CLASSES.indexOf(c); return i < 0 ? css("--muted") : css(`--s${i + 1}`); };
+const brl = v => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+const brl2 = v => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const brlS = v => `${v > 0 ? "+" : v < 0 ? "−" : ""}${brl(Math.abs(v))}`;
+const kbrl = v => Math.abs(v) >= 1e6 ? `R$ ${(v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} mi` : Math.abs(v) >= 1e3 ? `R$ ${(v / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil` : brl(v);
+const pct = (v, d = 1) => v == null || !isFinite(v) ? "—" : (v = +v.toFixed(d) || 0, `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d })}%`);
+const pctAbs = (v, d = 1) => v == null || !isFinite(v) ? "—" : `${v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d })}%`;
+const cls = v => v > 0 ? "up" : v < 0 ? "down" : "";
+const mesLabel = m => { const [a, n] = m.split("-"); return `${MES_NOME[n - 1]}/${a.slice(2)}`; };
+const mesLongo = m => { const [a, n] = m.split("-"); return `${MES_NOME[n - 1]} ${a}`; };
+const dataBR = s => s ? s.split("-").reverse().join("/") : "—";
+const soma = (arr, f = x => x) => arr.reduce((s, x) => s + f(x), 0);
+const cadeia = rs => (rs.reduce((f, r) => f * (1 + (r ?? 0) / 100), 1) - 1) * 100;
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const MESES = D.meses;
+const nomeDe = (() => {
+  const m = {};
+  MESES.forEach(x => x.posicoes.forEach(p => {
+    const id = p.id.startsWith("RV:") ? `RV:${p.ticker}` : p.id;
+    m[id] = { label: p.id.startsWith("RV:") ? p.ticker : p.nome, classe: p.classe };
+  }));
+  return id => m[id] || { label: id.split(":")[1], classe: "Outros" };
+})();
+
+// ---------------------------------------------------------------- estado
+const est = { ini: 1, fim: MESES.length - 1, evo: "brl", classeFiltro: null, ativoFiltro: null, ocultos: new Set(["Dólar"]) };
+let charts = [];
+
+function periodo() {
+  const meses = MESES.slice(est.ini, est.fim + 1);
+  const base = MESES[est.ini - 1];
+  const fim = MESES[est.fim];
+  const bench = Object.fromEntries(Object.entries(D.benchmarks).map(([k, s]) => [k, meses.map(m => s[m.mes] ?? null)]));
+  return { meses, base, fim, bench, todos: MESES.slice(est.ini - 1, est.fim + 1) };
+}
+
+// ---------------------------------------------------------------- controles de período
+function initPeriodo() {
+  const anos = [...new Set(MESES.slice(1).map(m => m.mes.slice(0, 4)))];
+  const fAno = document.getElementById("fAno");
+  fAno.innerHTML = `<option value="">—</option>` + anos.map(a => `<option>${a}</option>`).join("");
+  const opts = MESES.map((m, i) => i ? `<option value="${i}">${mesLongo(m.mes)}</option>` : "").join("");
+  document.getElementById("fIni").innerHTML = opts;
+  document.getElementById("fFim").innerHTML = opts;
+
+  document.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => aplicarPreset(b.dataset.preset)));
+  fAno.addEventListener("change", () => {
+    if (!fAno.value) return;
+    const idx = MESES.map((m, i) => [m, i]).filter(([m, i]) => i && m.mes.startsWith(fAno.value)).map(([, i]) => i);
+    setPeriodo(idx[0], idx[idx.length - 1], null);
+  });
+  document.getElementById("fIni").addEventListener("change", e => setPeriodo(+e.target.value, Math.max(+e.target.value, est.fim), null));
+  document.getElementById("fFim").addEventListener("change", e => setPeriodo(Math.min(est.ini, +e.target.value), +e.target.value, null));
+}
+function aplicarPreset(p) {
+  const last = MESES.length - 1;
+  const ano = MESES[last].mes.slice(0, 4);
+  const iniAno = MESES.findIndex((m, i) => i && m.mes.startsWith(ano));
+  const ini = { mes: last, ano: iniAno, "12m": Math.max(1, last - 11), tudo: 1 }[p];
+  setPeriodo(ini, last, p);
+}
+function setPeriodo(ini, fim, preset) {
+  est.ini = ini; est.fim = fim; est.preset = preset;
+  try { localStorage.setItem("carteira.periodo", JSON.stringify({ ini: MESES[ini].mes, fim: MESES[fim].mes, preset })); } catch (e) {}
+  render();
+}
+function syncControles() {
+  document.getElementById("fIni").value = est.ini;
+  document.getElementById("fFim").value = est.fim;
+  const a0 = MESES[est.ini].mes.slice(0, 4), a1 = MESES[est.fim].mes.slice(0, 4);
+  const anoInteiro = a0 === a1 && MESES[est.ini].mes === (MESES.find((m, i) => i && m.mes.startsWith(a0)) || {}).mes && (est.fim === MESES.length - 1 || MESES[est.fim].mes.endsWith("-12"));
+  document.getElementById("fAno").value = anoInteiro ? a0 : "";
+  document.querySelectorAll("[data-preset]").forEach(b => b.setAttribute("aria-pressed", b.dataset.preset === est.preset));
+  const n = est.fim - est.ini + 1;
+  document.getElementById("periodoTxt").textContent = `${n} ${n > 1 ? "meses" : "mês"} · de ${dataBR(fimDoMes(MESES[est.ini - 1].mes))} a ${dataBR(fimDoMes(MESES[est.fim].mes))} · dados mensais da B3`;
+}
+const fimDoMes = m => { const [a, n] = m.split("-").map(Number); return new Date(Date.UTC(a, n, 0)).toISOString().slice(0, 10); };
+
+// ---------------------------------------------------------------- chart helpers
+function base() {
+  Chart.defaults.font.family = 'system-ui,-apple-system,"Segoe UI",sans-serif';
+  Chart.defaults.color = css("--muted");
+  Chart.defaults.borderColor = css("--grid");
+  return { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false }, tooltip: tip() } };
+}
+function tip(extra = {}) {
+  return { backgroundColor: css("--surface"), titleColor: css("--ink"), bodyColor: css("--ink-2"), footerColor: css("--ink"), borderColor: css("--border"), borderWidth: 1, padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true, ...extra };
+}
+function legend(el, items) {
+  document.getElementById(el).innerHTML = items.map(([n, c]) => `<span><i style="background:${c}"></i>${esc(n)}</span>`).join("");
+}
+const eixoX = () => ({ grid: { display: false }, border: { color: css("--axis") }, ticks: { color: css("--ink-2") } });
+const eixoY = fmt => ({ grid: { color: css("--grid") }, border: { display: false }, ticks: { callback: fmt } });
+function endLabels(fmt) {
+  return {
+    id: "endLabels",
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart; ctx.save();
+      ctx.font = '11px system-ui,-apple-system,"Segoe UI",sans-serif'; ctx.fillStyle = css("--ink-2"); ctx.textBaseline = "middle";
+      chart.getDatasetMeta(0).data.forEach((bar, i) => {
+        const v = chart.data.datasets[0].data[i]; const neg = v < 0;
+        ctx.textAlign = neg ? "right" : "left"; ctx.fillText(fmt(v), bar.x + (neg ? -6 : 6), bar.y);
+      });
+      ctx.restore();
+    },
+  };
+}
+
+// ---------------------------------------------------------------- tiles
+function renderTiles(P) {
+  const r = P.meses.map(m => m.resumo);
+  const ganho = soma(r, x => x.ganho), aportes = soma(r, x => x.fluxo), prov = soma(r, x => x.proventos);
+  const rent = cadeia(r.map(x => x.rent));
+  const cdi = cadeia(P.bench.CDI || []);
+  const ibov = cadeia(P.bench.Ibovespa || []);
+  const variacao = P.fim.patrimonio - P.base.patrimonio;
+  const tiles = [
+    ["Patrimônio", brl(P.fim.patrimonio), `<span class="${cls(variacao)}">${brlS(variacao)}</span> desde ${mesLabel(P.base.mes)}`],
+    ["Ganho no período", `<span class="${cls(ganho)}">${brlS(ganho)}</span>`, "valorização + proventos, sem contar aportes"],
+    ["Rentabilidade", `<span class="${cls(rent)}">${pct(rent, 2)}</span>`, `${pctAbs(rent / cdi * 100, 0)} do CDI (${pct(cdi, 2)}) · Ibov ${pct(ibov, 1)}`],
+    ["Aportes líquidos", brlS(aportes), "aplicações e compras menos resgates e vendas"],
+    ["Proventos", brl(prov), `${brl(prov / P.meses.length)}/mês em média`],
+  ];
+  document.getElementById("tiles").innerHTML = tiles.map(([l, v, n]) => `<div class="card tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div></div>`).join("");
+}
+
+// ---------------------------------------------------------------- evolução
+function porClasse(mes) {
+  const o = {};
+  mes.posicoes.forEach(p => o[p.classe] = (o[p.classe] || 0) + p.valor);
+  return o;
+}
+function renderEvo(P) {
+  const meses = P.todos;
+  const vals = meses.map(porClasse);
+  const presentes = CLASSES.filter(c => vals.some(v => (v[c] || 0) > 0.5));
+  const pct = est.evo === "pct";
+  const aplicado = []; let acc = P.base.patrimonio;
+  meses.forEach((m, i) => { if (i) acc += m.resumo.fluxo; aplicado.push(acc); });
+  const ds = presentes.map(c => ({
+    type: "line", label: c, fill: true, stack: "s",
+    data: vals.map((v, i) => pct ? (v[c] || 0) / meses[i].patrimonio * 100 : (v[c] || 0)),
+    borderColor: corClasse(c), backgroundColor: corClasse(c) + "cc", borderWidth: 1, pointRadius: 0, pointHoverRadius: 3, tension: 0.2, order: 2,
+  }));
+  if (!pct) ds.push({ type: "line", label: "Total investido", data: aplicado, borderColor: css("--ink"), borderDash: [5, 4], borderWidth: 2, pointRadius: 0, fill: false, stack: "linha", tension: 0.2, order: 0 });
+  legend("lgEvo", [...presentes.map(c => [c, corClasse(c)]), ...(pct ? [] : [["Total investido (tracejado)", css("--ink")]])]);
+  charts.push(new Chart(document.getElementById("cEvo"), {
+    type: "line",
+    data: { labels: meses.map(m => mesLabel(m.mes)), datasets: ds },
+    options: {
+      ...base(), interaction: { mode: "index", intersect: false },
+      scales: { x: eixoX(), y: { ...eixoY(v => pct ? `${v}%` : kbrl(v)), stacked: true, beginAtZero: true, max: pct ? 100 : undefined } },
+      plugins: { legend: { display: false }, tooltip: tip({
+        itemSort: (a, b) => b.datasetIndex - a.datasetIndex,
+        callbacks: {
+          label: c => ` ${c.dataset.label}: ${pct ? pctAbs(c.raw) : brl(c.raw)}`,
+          footer: c => { const i = c[0].dataIndex; return pct ? "" : `Patrimônio: ${brl(meses[i].patrimonio)}\nRendeu sobre o investido: ${brlS(meses[i].patrimonio - aplicado[i])}`; },
+        },
+      }) },
+    },
+  }));
+}
+
+// ---------------------------------------------------------------- mês a mês e acumulado
+function renderMes(P) {
+  const r = P.meses.map(m => m.resumo.rent);
+  legend("lgMes", [["Carteira (positivo)", css("--pos")], ["Carteira (negativo)", css("--neg")], ["CDI", css("--ink")]]);
+  charts.push(new Chart(document.getElementById("cMes"), {
+    data: {
+      labels: P.meses.map(m => mesLabel(m.mes)),
+      datasets: [
+        { type: "bar", label: "Carteira", data: r, backgroundColor: r.map(v => v >= 0 ? css("--pos") : css("--neg")), borderRadius: 4, borderSkipped: "start", barPercentage: 0.7, order: 2 },
+        { type: "line", label: "CDI", data: P.bench.CDI, borderColor: "transparent", pointStyle: "line", pointRadius: 10, pointBorderWidth: 3, pointBorderColor: css("--ink"), pointHoverRadius: 12, order: 1 },
+      ],
+    },
+    options: {
+      ...base(), interaction: { mode: "index", intersect: false },
+      scales: { x: eixoX(), y: { ...eixoY(v => `${v}%`), grid: { color: c => c.tick.value === 0 ? css("--axis") : css("--grid") } } },
+      plugins: { legend: { display: false }, tooltip: tip({ callbacks: {
+        label: c => ` ${c.dataset.label}: ${pct(c.raw, 2)}`,
+        footer: c => { const m = P.meses[c[0].dataIndex]; return `Ganho: ${brlS(m.resumo.ganho)}\n%CDI: ${pctAbs(m.resumo.rent / P.bench.CDI[c[0].dataIndex] * 100, 0)}`; },
+      } }) },
+    },
+  }));
+}
+function renderAcum(P) {
+  const acum = rs => { let f = 1; return [0, ...rs.map(v => (f *= 1 + (v ?? 0) / 100, (f - 1) * 100))]; };
+  const series = BENCH.map(([n, v]) => [n, n === "Carteira" ? acum(P.meses.map(m => m.resumo.rent)) : acum(P.bench[n] || []), css(v)]);
+  document.getElementById("lgAcum").innerHTML = series.map(([n, s, c]) =>
+    `<button type="button" data-serie="${esc(n)}" aria-pressed="${!est.ocultos.has(n)}"><i style="background:${c}"></i>${esc(n)} <b>${pct(s[s.length - 1])}</b></button>`).join("");
+  document.querySelectorAll("#lgAcum [data-serie]").forEach(b => b.addEventListener("click", () => {
+    const n = b.dataset.serie; est.ocultos.has(n) ? est.ocultos.delete(n) : est.ocultos.add(n); render();
+  }));
+  const vis = series.filter(([n]) => !est.ocultos.has(n));
+  charts.push(new Chart(document.getElementById("cAcum"), {
+    type: "line",
+    data: { labels: P.todos.map(m => mesLabel(m.mes)), datasets: vis.map(([label, data, c]) => ({ label, data, borderColor: c, backgroundColor: c, borderWidth: label === "Carteira" ? 3 : 2, pointRadius: 0, pointHoverRadius: 5, pointHoverBorderColor: css("--surface"), pointHoverBorderWidth: 2, tension: 0.2 })) },
+    options: {
+      ...base(), interaction: { mode: "index", intersect: false }, layout: { padding: { right: 48 } },
+      scales: { x: eixoX(), y: eixoY(v => `${v}%`) },
+      plugins: { legend: { display: false }, tooltip: tip({ callbacks: { label: c => ` ${c.dataset.label}: ${pct(c.raw)}` } }) },
+    },
+    plugins: [{
+      id: "lineEnd",
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart; ctx.save();
+        ctx.font = '11px system-ui,-apple-system,"Segoe UI",sans-serif'; ctx.textBaseline = "middle"; ctx.fillStyle = css("--ink-2");
+        const last = chart.data.labels.length - 1;
+        const pts = chart.data.datasets.map((d, i) => { const p = chart.getDatasetMeta(i).data[last]; return { x: p.x, y: p.y, t: pct(d.data[last], 0) }; }).sort((a, b) => a.y - b.y);
+        for (let i = 1; i < pts.length; i++) pts[i].y = Math.max(pts[i].y, pts[i - 1].y + 13);
+        pts.forEach(p => ctx.fillText(p.t, p.x + 6, p.y));
+        ctx.restore();
+      },
+    }],
+  }));
+}
+
+// ---------------------------------------------------------------- por classe
+function renderClasse(P) {
+  const linhas = CLASSES.map(c => {
+    const ms = P.meses.map(m => m.classes[c]).filter(Boolean);
+    if (!ms.length) return null;
+    const ganho = soma(ms, x => x.ganho);
+    const rent = ms.some(x => x.rent != null) ? cadeia(ms.map(x => x.rent)) : null;
+    const bn = D.bench_classe[c];
+    const bench = bn ? cadeia(P.bench[bn] || []) : null;
+    return { c, ganho, rent, bn, bench, fim: P.fim.posicoes.filter(p => p.classe === c).reduce((s, p) => s + p.valor, 0) };
+  }).filter(l => l && (l.fim > 0.5 || Math.abs(l.ganho) > 0.5));
+  document.getElementById("tClasse").innerHTML =
+    `<thead><tr><th>Tipo</th><th class="n">Ganho</th><th class="n">Rent.</th><th class="n">Benchmark</th><th class="n">Diferença</th></tr></thead><tbody>` +
+    linhas.map(l => `<tr class="click" data-classe="${esc(l.c)}"><td><span class="dot" style="background:${corClasse(l.c)}"></span>${esc(l.c)}</td><td class="n ${cls(l.ganho)}">${brlS(l.ganho)}</td><td class="n ${cls(l.rent)}">${pct(l.rent)}</td><td class="n">${l.bn ? `${esc(l.bn)} ${pct(l.bench)}` : "—"}</td><td class="n ${cls(l.rent - l.bench)}">${l.rent == null || l.bench == null ? "—" : `${pct(l.rent - l.bench)} p.p.`}</td></tr>`).join("") +
+    `</tbody>`;
+  document.querySelectorAll("#tClasse [data-classe]").forEach(tr => tr.addEventListener("click", () => setFiltro(tr.dataset.classe, null)));
+}
+function renderGanho(P) {
+  const presentes = CLASSES.filter(c => P.meses.some(m => m.classes[c] && Math.abs(m.classes[c].ganho) > 0.5));
+  legend("lgGanho", presentes.map(c => [c, corClasse(c)]));
+  charts.push(new Chart(document.getElementById("cGanho"), {
+    type: "bar",
+    data: { labels: P.meses.map(m => mesLabel(m.mes)), datasets: presentes.map(c => ({ label: c, data: P.meses.map(m => m.classes[c]?.ganho ?? 0), backgroundColor: corClasse(c), borderColor: css("--surface"), borderWidth: 1, borderSkipped: false, borderRadius: 2, barPercentage: 0.75 })) },
+    options: {
+      ...base(), interaction: { mode: "index", intersect: false },
+      scales: { x: { ...eixoX(), stacked: true }, y: { ...eixoY(v => kbrl(v)), stacked: true, grid: { color: c => c.tick.value === 0 ? css("--axis") : css("--grid") } } },
+      plugins: { legend: { display: false }, tooltip: tip({ filter: c => Math.abs(c.raw) > 0.5, callbacks: { label: c => ` ${c.dataset.label}: ${brlS(c.raw)}`, footer: c => `Total: ${brlS(P.meses[c[0].dataIndex].resumo.ganho)}` } }) },
+    },
+  }));
+}
+
+// ---------------------------------------------------------------- treemap
+function renderTree(P) {
+  const tree = P.fim.posicoes.filter(p => p.valor > 0).map(p => ({ classe: p.classe, ativo: p.id.startsWith("RV:") ? p.ticker : p.nome, valor: p.valor }));
+  const g = {}; tree.forEach(t => { const k = `${t.classe}|${t.ativo}`; g[k] = g[k] ? { ...g[k], valor: g[k].valor + t.valor } : t; });
+  const itens = Object.values(g);
+  const total = P.fim.patrimonio;
+  legend("lgTree", CLASSES.filter(c => itens.some(i => i.classe === c)).map(c => [`${c} · ${pctAbs(soma(itens.filter(i => i.classe === c), i => i.valor) / total * 100, 0)}`, corClasse(c)]));
+  try { Chart.registry.getController("treemap"); } catch (e) {
+    document.getElementById("cTree").replaceWith(Object.assign(document.createElement("p"), { className: "hint", textContent: "Gráfico de composição indisponível (biblioteca não carregou)." }));
+    return;
+  }
+  const ink = css("--surface");
+  charts.push(new Chart(document.getElementById("cTree"), {
+    type: "treemap",
+    data: { datasets: [{
+      tree: itens, key: "valor", groups: ["classe", "ativo"], spacing: 0, borderWidth: c => c.raw?.l === 0 ? 0 : 1,
+      backgroundColor: c => { const r = c.raw; if (!r?._data) return "transparent"; const base = corClasse(r._data.classe); return r.l === 0 ? base : base + "d9"; },
+      borderColor: ink,
+      captions: { display: true, color: "#ffffff", font: { size: 12, weight: "600" }, padding: 4 },
+      labels: { display: true, color: "#ffffff", font: { size: 11 }, formatter: c => c.raw?._data ? [c.raw._data.ativo?.slice(0, 18), pctAbs(c.raw.v / total * 100)] : "", overflow: "hidden" },
+      dividers: { display: false },
+    }] },
+    options: {
+      ...base(),
+      onClick: (_, els) => {
+        const d = els[0]?.element?.$context?.raw?._data; if (!d) return;
+        setFiltro(d.classe, els[0].element.$context.raw.l === 1 ? d.ativo : null);
+      },
+      onHover: (ev, els) => { ev.native.target.style.cursor = els.length ? "pointer" : "default"; },
+      plugins: { legend: { display: false }, tooltip: tip({ callbacks: {
+        title: c => { const d = c[0].raw._data; return c[0].raw.l === 1 ? d.ativo : d.classe; },
+        label: c => ` ${brl(c.raw.v)} · ${pctAbs(c.raw.v / total * 100)} da carteira`,
+      } }) },
+    },
+  }));
+}
+
+// ---------------------------------------------------------------- contribuições
+function renderContrib(P) {
+  const g = {};
+  P.meses.forEach(m => Object.entries(m.ganho_ativo || {}).forEach(([id, v]) => g[id] = (g[id] || 0) + v));
+  const todos = Object.entries(g).map(([id, v]) => ({ id, v, ...nomeDe(id) })).sort((a, b) => b.v - a.v);
+  const top = todos.slice(0, 8), bot = todos.slice(-8).filter(x => x.v < 0 && !top.includes(x));
+  const rows = [...top.filter(x => x.v > 0), ...bot];
+  document.getElementById("contribWrap").style.height = `${rows.length * 24 + 30}px`;
+  charts.push(new Chart(document.getElementById("cContrib"), {
+    type: "bar",
+    data: { labels: rows.map(r => r.label.length > 22 ? r.label.slice(0, 21) + "…" : r.label), datasets: [{ data: rows.map(r => r.v), backgroundColor: rows.map(r => r.v >= 0 ? css("--pos") : css("--neg")), borderRadius: 4, borderSkipped: "start", barPercentage: 0.75 }] },
+    options: {
+      ...base(), indexAxis: "y", layout: { padding: { right: 8 } },
+      onClick: (_, els) => { if (els.length) { const r = rows[els[0].index]; setFiltro(r.classe, r.label); } },
+      scales: { x: { display: false, min: Math.min(0, ...rows.map(r => r.v)) * 1.45, max: Math.max(0, ...rows.map(r => r.v)) * 1.3 }, y: { grid: { display: false }, border: { display: false }, ticks: { color: css("--ink-2"), font: { size: 11 } } } },
+      plugins: { legend: { display: false }, tooltip: tip({ callbacks: { title: c => rows[c[0].dataIndex].label, label: c => ` ${brlS(c.raw)} · ${rows[c.dataIndex].classe}` } }) },
+    },
+    plugins: [endLabels(v => brlS(v))],
+  }));
+}
+
+// ---------------------------------------------------------------- proventos
+function renderProv(P) {
+  const tipos = TIPOS_PROV.filter(t => P.meses.some(m => m.proventos.some(p => p.tipo === t)));
+  const total = soma(P.meses, m => soma(m.proventos, p => p.valor));
+  document.getElementById("provHint").textContent = `${brl(total)} no período, ` + tipos.map(t => `${t}: ${brl(soma(P.meses, m => soma(m.proventos.filter(p => p.tipo === t), p => p.valor)))}`).join(" · ");
+  legend("lgProv", tipos.map((t, i) => [t, css(`--s${i + 1}`)]));
+  charts.push(new Chart(document.getElementById("cProv"), {
+    type: "bar",
+    data: { labels: P.meses.map(m => mesLabel(m.mes)), datasets: tipos.map((t, i) => ({ label: t, data: P.meses.map(m => soma(m.proventos.filter(p => p.tipo === t), p => p.valor)), backgroundColor: css(`--s${i + 1}`), borderColor: css("--surface"), borderWidth: { top: 1 }, borderSkipped: false, borderRadius: 2, barPercentage: 0.7 })) },
+    options: {
+      ...base(), interaction: { mode: "index", intersect: false },
+      scales: { x: { ...eixoX(), stacked: true }, y: { ...eixoY(v => kbrl(v)), stacked: true } },
+      plugins: { legend: { display: false }, tooltip: tip({ filter: c => c.raw > 0, callbacks: { label: c => ` ${c.dataset.label}: ${brl2(c.raw)}`, footer: c => `Total: ${brl2(soma(P.meses[c[0].dataIndex].proventos, p => p.valor))}` } }) },
+    },
+  }));
+  const g = {};
+  P.meses.forEach(m => m.proventos.forEach(p => g[p.ticker] = (g[p.ticker] || 0) + p.valor));
+  const valorFim = t => soma(P.fim.posicoes.filter(p => p.ticker === t), p => p.valor);
+  const linhas = Object.entries(g).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  document.getElementById("tProv").innerHTML = `<thead><tr><th>Ativo</th><th class="n">Recebido</th><th class="n">Posição no fim</th><th class="n">Yield no período</th></tr></thead><tbody>` +
+    linhas.map(([t, v]) => { const pos = valorFim(t); return `<tr><td><strong>${esc(t)}</strong></td><td class="n">${brl2(v)}</td><td class="n">${pos ? brl(pos) : "—"}</td><td class="n">${pos ? pctAbs(v / pos * 100, 2) : "—"}</td></tr>`; }).join("") + "</tbody>";
+}
+
+// ---------------------------------------------------------------- tabela mês a mês
+function renderMeses(P) {
+  const linhas = P.meses.map((m, i) => {
+    const r = m.resumo, cdi = P.bench.CDI[i];
+    return `<tr class="click${P.meses.length === 1 ? " sel" : ""}" data-idx="${MESES.indexOf(m)}"><td>${mesLongo(m.mes)}</td><td class="n">${brl2(r.inicial)}</td><td class="n">${brlS(r.fluxo)}</td><td class="n">${brl2(r.proventos)}</td><td class="n ${cls(r.ganho)}">${brlS(r.ganho)}</td><td class="n">${brl2(r.final)}</td><td class="n ${cls(r.rent)}">${pct(r.rent, 2)}</td><td class="n">${pct(cdi, 2)}</td><td class="n">${pctAbs(r.rent / cdi * 100, 0)}</td></tr>`;
+  });
+  const r = P.meses.map(m => m.resumo);
+  const rent = cadeia(r.map(x => x.rent)), cdi = cadeia(P.bench.CDI);
+  document.getElementById("tMeses").innerHTML =
+    `<thead><tr><th>Mês</th><th class="n">Patrimônio inicial</th><th class="n">Aportes líquidos</th><th class="n">Proventos</th><th class="n">Ganho</th><th class="n">Patrimônio final</th><th class="n">Rent.</th><th class="n">CDI</th><th class="n">%CDI</th></tr></thead><tbody>` +
+    linhas.join("") +
+    (P.meses.length > 1 ? `<tr class="total"><td>Período</td><td class="n">${brl2(P.base.patrimonio)}</td><td class="n">${brlS(soma(r, x => x.fluxo))}</td><td class="n">${brl2(soma(r, x => x.proventos))}</td><td class="n ${cls(soma(r, x => x.ganho))}">${brlS(soma(r, x => x.ganho))}</td><td class="n">${brl2(P.fim.patrimonio)}</td><td class="n ${cls(rent)}">${pct(rent, 2)}</td><td class="n">${pct(cdi, 2)}</td><td class="n">${pctAbs(rent / cdi * 100, 0)}</td></tr>` : "") +
+    "</tbody>";
+  document.querySelectorAll("#tMeses [data-idx]").forEach(tr => tr.addEventListener("click", () => setPeriodo(+tr.dataset.idx, +tr.dataset.idx, null)));
+}
+
+// ---------------------------------------------------------------- movimentações
+function renderMov(P) {
+  const movs = P.meses.flatMap(m => (m.movimentos || []).map(x => ({ ...x, mes: m.mes })));
+  const sel = document.getElementById("fMov");
+  const atual = sel.value;
+  const tipos = [...new Set(movs.map(m => m.tipo))];
+  sel.innerHTML = `<option value="">Todas (${movs.length})</option>` + tipos.map(t => `<option ${t === atual ? "selected" : ""}>${esc(t)}</option>`).join("");
+  const lista = movs.filter(m => !sel.value || m.tipo === sel.value).sort((a, b) => b.mes.localeCompare(a.mes) || Math.abs(b.valor) - Math.abs(a.valor));
+  document.getElementById("tMov").innerHTML = `<thead><tr><th>Mês</th><th>Tipo</th><th>Ativo</th><th class="n">Valor</th></tr></thead><tbody>` +
+    lista.map(m => `<tr><td>${mesLabel(m.mes)}</td><td>${esc(m.tipo)}</td><td class="wrap"><span class="dot" style="background:${corClasse(m.classe)}"></span>${esc(m.ativo)}</td><td class="n ${cls(m.valor)}">${brlS(m.valor)}</td></tr>`).join("") +
+    `<tr class="total"><td colspan="3">Saldo (${lista.length})</td><td class="n">${brlS(soma(lista, m => m.valor))}</td></tr></tbody>`;
+}
+
+// ---------------------------------------------------------------- alertas
+function renderAlerts(P) {
+  const out = [];
+  const pos = P.fim.posicoes, total = P.fim.patrimonio;
+  const ref = fimDoMes(P.fim.mes);
+  const em90 = new Date(Date.parse(ref) + 90 * 864e5).toISOString().slice(0, 10);
+  pos.filter(p => /LIQUIDA/i.test(p.emissor || "") && p.valor > 0).forEach(p =>
+    out.push(["critical", "!", `${p.nome}: emissor em liquidação extrajudicial`, `${brl(p.valor)}. Coberto pelo FGC até R$ 250 mil por CPF.`]));
+  pos.filter(p => p.valor === 0 && p.quantidade > 0).forEach(p => /^[A-Z]{4}1[2-5]$/.test(p.ticker || "") && p.id.startsWith("RV:")
+    ? out.push(["warning", "↻", `${p.ticker}: ${p.quantidade.toLocaleString("pt-BR")} direitos de subscrição`, "Sem valor de mercado. Exerça (comprando novas cotas) ou venda o direito antes do prazo, senão ele expira."])
+    : out.push(["serious", "!", `${p.nome} está com valor R$ 0`, `${p.quantidade.toLocaleString("pt-BR")} unidades sem preço (emissor em recuperação judicial ou papel sem negociação).`]));
+  const venc = pos.filter(p => p.vencimento && p.vencimento > ref && p.vencimento <= em90 && p.valor > 0).sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+  if (venc.length) out.push(["warning", "↻", `${venc.length} título(s) vencem nos próximos 90 dias (${brl(soma(venc, p => p.valor))})`, venc.map(p => `${p.nome} ${dataBR(p.vencimento)}`).join(" · ")]);
+  const emis = {};
+  pos.filter(p => ["CDB", "LCA", "LCI", "LC", "RDB"].includes(p.tipo_rf)).forEach(p => emis[p.emissor] = (emis[p.emissor] || 0) + p.valor);
+  Object.entries(emis).filter(([, v]) => v > 200000).forEach(([e, v]) => out.push(["critical", "!", `${e}: ${brl(v)} perto ou acima do limite do FGC`, "O FGC cobre até R$ 250 mil por CPF por conglomerado."]));
+  const rv = {};
+  pos.filter(p => p.id.startsWith("RV:")).forEach(p => rv[p.ticker] = (rv[p.ticker] || 0) + p.valor);
+  Object.entries(rv).filter(([, v]) => v / total > 0.05).sort((a, b) => b[1] - a[1]).forEach(([t, v]) => out.push(["info", "i", `${t} é ${pctAbs(v / total * 100)} da carteira`, brl(v)]));
+  const av = P.meses.flatMap(m => (m.avisos || []).map(a => `${mesLabel(m.mes)}: ${a}`));
+  if (av.length) out.push(["info", "i", `${av.length} ajuste(s) de cálculo no período`, av.join(" · ")]);
+  document.getElementById("alerts").innerHTML = out.length ? out.map(([c, ic, t, s]) => `<li class="${c}"><span class="ic" aria-hidden="true">${ic}</span><div><strong>${esc(t)}</strong><small>${esc(s)}</small></div></li>`).join("") : `<li class="info"><span class="ic">✓</span><div><strong>Nada a destacar</strong></div></li>`;
+}
+
+// ---------------------------------------------------------------- posições
+let sortKey = "valor", sortDir = -1;
+function setFiltro(classe, ativo) {
+  const igual = est.classeFiltro === classe && est.ativoFiltro === ativo;
+  est.classeFiltro = igual ? null : classe; est.ativoFiltro = igual ? null : ativo;
+  document.getElementById("fClasse").value = "";
+  renderPos(periodo());
+  if (!igual) document.getElementById("tPos").closest("section").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function renderPos(P) {
+  const pill = document.getElementById("filtroPill");
+  pill.hidden = !est.classeFiltro;
+  pill.innerHTML = est.classeFiltro ? `${esc(est.ativoFiltro || est.classeFiltro)} <button type="button" aria-label="Limpar filtro" style="padding:0 4px;border:0;background:none">✕</button>` : "";
+  pill.querySelector("button")?.addEventListener("click", () => setFiltro(est.classeFiltro, est.ativoFiltro));
+
+  // preço de referência para a variação: base do período ou primeira aparição dentro dele
+  const precoIni = {};
+  P.todos.forEach(m => m.posicoes.forEach(p => { if (p.preco && precoIni[p.ticker] == null) precoIni[p.ticker] = p.preco; }));
+  const ganho = {};
+  P.meses.forEach(m => Object.entries(m.ganho_ativo || {}).forEach(([id, v]) => ganho[id] = (ganho[id] || 0) + v));
+
+  const q = document.getElementById("busca").value.toLowerCase();
+  const fc = document.getElementById("fClasse").value, fi = document.getElementById("fInst").value;
+  const total = P.fim.patrimonio;
+  const rows = P.fim.posicoes.filter(p => p.valor > 0 || p.quantidade > 0).map(p => {
+    const gid = p.id.startsWith("RV:") ? `RV:${p.ticker}` : p.id;
+    const nRV = P.fim.posicoes.filter(x => x.id.startsWith("RV:") && x.ticker === p.ticker).length;
+    return { ...p, peso: p.valor / total * 100, var: p.preco && precoIni[p.ticker] ? (p.preco / precoIni[p.ticker] - 1) * 100 : null, ganho: ganho[gid] != null ? ganho[gid] / (p.id.startsWith("RV:") ? nRV : 1) : null, rotulo: p.id.startsWith("RV:") ? p.ticker : p.nome };
+  })
+    .filter(p => (!fc || p.classe === fc) && (!fi || p.instituicao === fi))
+    .filter(p => !est.classeFiltro || (p.classe === est.classeFiltro && (!est.ativoFiltro || p.rotulo === est.ativoFiltro)))
+    .filter(p => !q || `${p.ticker} ${p.nome}`.toLowerCase().includes(q))
+    .sort((a, b) => { const x = a[sortKey] ?? -Infinity, y = b[sortKey] ?? -Infinity; return (x > y ? 1 : x < y ? -1 : 0) * sortDir; });
+  const COLS = [["rotulo", "Ativo"], ["classe", "Tipo"], ["instituicao", "Instituição"], ["quantidade", "Qtd", 1], ["preco", "Preço", 1], ["valor", "Valor", 1], ["peso", "% carteira", 1], ["var", "Var. preço", 1], ["ganho", "Ganho no período", 1], ["vencimento", "Vencimento"]];
+  const cell = (p, k) => ({
+    rotulo: `<td class="wrap">${p.id.startsWith("RV:") ? `<strong>${esc(p.ticker)}</strong> <span style="color:var(--muted)">${esc(p.nome)}</span>` : esc(p.nome)}</td>`,
+    classe: `<td><span class="dot" style="background:${corClasse(p.classe)}"></span>${esc(p.classe)}</td>`,
+    quantidade: `<td class="n">${p.quantidade.toLocaleString("pt-BR")}</td>`,
+    preco: `<td class="n">${p.preco ? brl2(p.preco) : ""}</td>`,
+    valor: `<td class="n">${brl2(p.valor)}</td>`,
+    peso: `<td class="n">${pctAbs(p.peso, 2)}</td>`,
+    var: `<td class="n ${cls(p.var)}">${pct(p.var)}</td>`,
+    ganho: `<td class="n ${cls(p.ganho)}">${p.ganho == null ? "—" : brlS(p.ganho)}</td>`,
+    vencimento: `<td class="n">${p.vencimento ? dataBR(p.vencimento) : ""}</td>`,
+  }[k] ?? `<td>${esc(p[k])}</td>`);
+  document.getElementById("tPos").innerHTML =
+    `<thead><tr>${COLS.map(([k, l, n]) => `<th data-sort="${k}" class="${n ? "n " : ""}${sortKey === k ? (sortDir > 0 ? "asc" : "desc") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(p => `<tr>${COLS.map(([k]) => cell(p, k)).join("")}</tr>`).join("") +
+    `<tr class="total"><td>Total (${rows.length})</td><td></td><td></td><td></td><td></td><td class="n">${brl2(soma(rows, p => p.valor))}</td><td class="n">${pctAbs(soma(rows, p => p.peso), 2)}</td><td></td><td></td><td></td></tr></tbody>`;
+  document.querySelectorAll("#tPos th").forEach(th => th.addEventListener("click", () => {
+    const k = th.dataset.sort;
+    sortDir = sortKey === k ? -sortDir : (["rotulo", "classe", "instituicao", "vencimento"].includes(k) ? 1 : -1);
+    sortKey = k; renderPos(periodo());
+  }));
+}
+function initPos() {
+  const todas = MESES.flatMap(m => m.posicoes);
+  const opts = (vals, t) => `<option value="">${t}</option>` + vals.map(v => `<option>${esc(v)}</option>`).join("");
+  document.getElementById("fClasse").innerHTML = opts(CLASSES.filter(c => todas.some(p => p.classe === c)), "Todos os tipos");
+  document.getElementById("fInst").innerHTML = opts([...new Set(todas.map(p => p.instituicao))], "Todas as instituições");
+  ["busca", "fClasse", "fInst"].forEach(id => document.getElementById(id).addEventListener("input", () => renderPos(periodo())));
+  document.getElementById("fMov").addEventListener("change", () => renderMov(periodo()));
+}
+
+// ---------------------------------------------------------------- boot
+function render() {
+  const P = periodo();
+  syncControles();
+  charts.forEach(c => c.destroy()); charts = [];
+  renderTiles(P); renderEvo(P); renderMes(P); renderAcum(P); renderClasse(P); renderGanho(P);
+  renderTree(P); renderContrib(P); renderProv(P); renderMeses(P); renderMov(P); renderAlerts(P); renderPos(P);
+}
+function init() {
+  if (!D || MESES.length < 2) {
+    document.querySelector("main").innerHTML = "<p>Sem dados. Rode <code>scripts/importar.py</code> e <code>scripts/gerar.py</code>.</p>";
+    return;
+  }
+  const ult = MESES[MESES.length - 1].mes;
+  document.getElementById("subtitulo").textContent = `Última posição: ${dataBR(fimDoMes(ult))} · B3 Área do Investidor + Banco Central + Yahoo Finance · atualizado em ${dataBR(D.gerado_em)}`;
+  document.getElementById("notas").innerHTML = [
+    "Posições, preços, proventos e negociações vêm dos relatórios consolidados mensais da B3. Renda fixa bancária pelo valor na curva; Tesouro a mercado.",
+    "Rentabilidade mensal pelo método de Dietz modificado: ganho ÷ (patrimônio inicial + metade dos aportes do mês). Meses encadeados para o período.",
+    "A B3 não informa aplicações e resgates de CDB/LCA/Tesouro: são deduzidos pela diferença entre os meses. Compras de fim de mês entram quando liquidam.",
+    "Benchmarks: CDI, IPCA e PTAX (Banco Central); Ibovespa, S&P 500 e IFIX via ETF XFIX11 (Yahoo Finance). Caixinhas/RDB do Nubank não aparecem na B3.",
+    "A B3 entrega a posição por fim de mês; por isso o menor período selecionável é um mês.",
+  ].map(t => `<li>${t}</li>`).join("");
+  initPeriodo(); initPos();
+  document.querySelectorAll("[data-evo]").forEach(b => b.addEventListener("click", () => {
+    est.evo = b.dataset.evo; document.querySelectorAll("[data-evo]").forEach(x => x.setAttribute("aria-pressed", x === b)); render();
+  }));
+  document.getElementById("tema").addEventListener("click", () => {
+    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+    document.documentElement.dataset.theme = cur === "dark" ? "light" : "dark";
+    render();
+  });
+  let salvo = null;
+  try { salvo = JSON.parse(localStorage.getItem("carteira.periodo")); } catch (e) {}
+  if (salvo?.preset) return aplicarPreset(salvo.preset);
+  const i = MESES.findIndex(m => m.mes === salvo?.ini), f = MESES.findIndex(m => m.mes === salvo?.fim);
+  if (i > 0 && f >= i) return setPeriodo(i, f, null);
+  aplicarPreset("ano");
+}
+init();
+</script>
+</body>
+</html>

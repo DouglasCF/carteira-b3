@@ -1,0 +1,8 @@
+# dados financeiros pessoais ficam só nesta máquina
+dados/
+cache/
+relatorios/data.js
+relatorios/arquivo/
+.venv/
+__pycache__/
+.DS_Store
