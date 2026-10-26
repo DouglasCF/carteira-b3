@@ -159,10 +159,14 @@ footer li { margin-bottom: 4px; }
   </section>
 
   <section class="card" style="margin-bottom:16px">
-    <h2>Composição no fim do período</h2>
-    <p class="hint">Área proporcional ao valor. Passe o mouse para ver cada ativo; clique para filtrar a tabela de posições.</p>
+    <div class="row">
+      <div><h2>Composição no fim do período</h2></div>
+      <span class="spacer"></span>
+      <div class="seg"><button type="button" data-tree="destaque" aria-pressed="true">Destacar menores</button><button type="button" data-tree="prop" aria-pressed="false">Proporcional</button></div>
+    </div>
+    <p class="hint" id="treeHint"></p>
     <div class="legend" id="lgTree"></div>
-    <div class="chart" style="height:420px"><canvas id="cTree"></canvas></div>
+    <div class="chart" style="height:480px"><canvas id="cTree"></canvas></div>
   </section>
 
   <section class="grid g-2">
@@ -251,7 +255,7 @@ const nomeDe = (() => {
 })();
 
 // ---------------------------------------------------------------- estado
-const est = { ini: 1, fim: MESES.length - 1, evo: "brl", classeFiltro: null, ativoFiltro: null, ocultos: new Set(["Dólar"]) };
+const est = { ini: 1, fim: MESES.length - 1, evo: "brl", tree: "destaque", classeFiltro: null, ativoFiltro: null, ocultos: new Set(["Dólar"]) };
 let charts = [];
 
 function periodo() {
@@ -475,37 +479,74 @@ function renderGanho(P) {
 }
 
 // ---------------------------------------------------------------- treemap
-function renderTree(P) {
-  const tree = P.fim.posicoes.filter(p => p.valor > 0).map(p => ({ classe: p.classe, ativo: p.id.startsWith("RV:") ? p.ticker : p.nome, valor: p.valor }));
-  const g = {}; tree.forEach(t => { const k = `${t.classe}|${t.ativo}`; g[k] = g[k] ? { ...g[k], valor: g[k].valor + t.valor } : t; });
-  const itens = Object.values(g);
+// nomes curtos para caber nos blocos
+const curtoEmissor = e => titleCase(e).replace(/\b(Banco|Bco|S\/A|S\.A\.?|Sa|Multiplo|Financeira|Credito|Financiamento|E|Investimento|Cfi)\b\.?/gi, "").replace(/\s+/g, " ").trim().slice(0, 16);
+const curtoTesouro = n => n.replace(/^Tesouro /, "").replace("Renda+ Aposentadoria Extra", "Renda+").replace("Prefixado", "Pré");
+const titleCase = s => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+
+function itensTree(P) {
   const total = P.fim.patrimonio;
-  legend("lgTree", CLASSES.filter(c => itens.some(i => i.classe === c)).map(c => [`${c} · ${pctAbs(soma(itens.filter(i => i.classe === c), i => i.valor) / total * 100, 0)}`, corClasse(c)]));
+  const g = {};
+  P.fim.posicoes.filter(p => p.valor > 0).forEach(p => {
+    // CDB/LCA agrupados por banco emissor; ações/FIIs somados entre corretoras
+    const [rotulo, filtro] = p.id.startsWith("RV:") ? [p.ticker, p.ticker]
+      : p.classe === "Tesouro Direto" ? [curtoTesouro(p.nome), p.nome]
+      : [curtoEmissor(p.emissor || p.nome), null];
+    const k = `${p.classe}|${rotulo}`;
+    g[k] ??= { classe: p.classe, ativo: rotulo, filtro, valor: 0, membros: [] };
+    g[k].valor += p.valor;
+    g[k].membros.push(p.id.startsWith("RV:") ? `${p.ticker} · ${p.instituicao} ${brl(p.valor)}` : `${p.tipo_rf || curtoTesouro(p.nome)} ${brl(p.valor)}${p.vencimento ? ` · vence ${dataBR(p.vencimento)}` : ""}`);
+  });
+  // blocos abaixo de 0,4% da carteira viram um "Outros" por classe
+  const out = {};
+  Object.values(g).forEach(it => {
+    if (it.valor / total >= 0.004) return void (out[`${it.classe}|${it.ativo}`] = it);
+    const k = `${it.classe}|outros`;
+    out[k] ??= { classe: it.classe, ativo: "Outros", filtro: null, valor: 0, membros: [], n: 0 };
+    out[k].valor += it.valor; out[k].n++; out[k].membros.push(`${it.ativo} ${brl(it.valor)}`);
+  });
+  return Object.values(out).map(it => it.ativo === "Outros" && it.n === 1 ? { ...it, ativo: it.membros[0].replace(/ R\$.*$/, "") } : it.ativo === "Outros" ? { ...it, ativo: `Outros (${it.n})` } : it);
+}
+
+function renderTree(P) {
+  const itens = itensTree(P);
+  const total = P.fim.patrimonio;
+  const destaque = est.tree === "destaque";
+  // modo "destacar menores": área ∝ valor^0,55 (comprime os grandes); rótulos e tooltip seguem o valor real
+  itens.forEach(it => it.area = destaque ? Math.pow(it.valor, 0.55) : it.valor);
+  const porChave = Object.fromEntries(itens.map(it => [`${it.classe}|${it.ativo}`, it]));
+  const totClasse = c => soma(itens.filter(i => i.classe === c), i => i.valor);
+  legend("lgTree", CLASSES.filter(c => itens.some(i => i.classe === c)).map(c => [`${c} · ${pctAbs(totClasse(c) / total * 100, 0)}`, corClasse(c)]));
+  document.getElementById("treeHint").textContent = destaque
+    ? "Os blocos grandes estão comprimidos para os pequenos aparecerem; a porcentagem escrita é a real. CDBs/LCAs agrupados por banco; ativos abaixo de 0,4% em “Outros”."
+    : "Área proporcional ao valor. CDBs/LCAs agrupados por banco; ativos abaixo de 0,4% em “Outros”.";
   try { Chart.registry.getController("treemap"); } catch (e) {
     document.getElementById("cTree").replaceWith(Object.assign(document.createElement("p"), { className: "hint", textContent: "Gráfico de composição indisponível (biblioteca não carregou)." }));
     return;
   }
-  const ink = css("--surface");
+  const item = r => r?._data && porChave[`${r._data.classe}|${r._data.ativo}`];
   charts.push(new Chart(document.getElementById("cTree"), {
     type: "treemap",
     data: { datasets: [{
-      tree: itens, key: "valor", groups: ["classe", "ativo"], spacing: 0, borderWidth: c => c.raw?.l === 0 ? 0 : 1,
-      backgroundColor: c => { const r = c.raw; if (!r?._data) return "transparent"; const base = corClasse(r._data.classe); return r.l === 0 ? base : base + "d9"; },
-      borderColor: ink,
-      captions: { display: true, color: "#ffffff", font: { size: 12, weight: "600" }, padding: 4 },
-      labels: { display: true, color: "#ffffff", font: { size: 11 }, formatter: c => c.raw?._data ? [c.raw._data.ativo?.slice(0, 18), pctAbs(c.raw.v / total * 100)] : "", overflow: "hidden" },
+      tree: itens, key: "area", groups: ["classe", "ativo"], spacing: 0, borderWidth: c => c.raw?.l === 0 ? 0 : 1,
+      backgroundColor: c => { const r = c.raw; if (!r?._data) return "transparent"; const b = corClasse(r._data.classe); return r.l === 0 ? b : b + "d9"; },
+      borderColor: css("--surface"),
+      captions: { display: true, color: "#ffffff", font: { size: 12, weight: "600" }, padding: 4, formatter: c => c.raw?._data ? `${c.raw._data.classe} · ${pctAbs(totClasse(c.raw._data.classe) / total * 100, 0)}` : "" },
+      labels: { display: true, color: "#ffffff", font: [{ size: 11, weight: "600" }, { size: 11 }], overflow: "fit", formatter: c => { const it = item(c.raw); return it ? [it.ativo, pctAbs(it.valor / total * 100)] : ""; } },
       dividers: { display: false },
     }] },
     options: {
       ...base(),
       onClick: (_, els) => {
-        const d = els[0]?.element?.$context?.raw?._data; if (!d) return;
-        setFiltro(d.classe, els[0].element.$context.raw.l === 1 ? d.ativo : null);
+        const r = els[0]?.element?.$context?.raw; if (!r?._data) return;
+        const it = r.l === 1 ? item(r) : null;
+        setFiltro(r._data.classe, it?.filtro ?? null);
       },
       onHover: (ev, els) => { ev.native.target.style.cursor = els.length ? "pointer" : "default"; },
-      plugins: { legend: { display: false }, tooltip: tip({ callbacks: {
-        title: c => { const d = c[0].raw._data; return c[0].raw.l === 1 ? d.ativo : d.classe; },
-        label: c => ` ${brl(c.raw.v)} · ${pctAbs(c.raw.v / total * 100)} da carteira`,
+      plugins: { legend: { display: false }, tooltip: tip({ filter: (c, _, arr) => c.raw.l === Math.max(...arr.map(x => x.raw.l)), callbacks: {
+        title: c => { const r = c[0].raw; return r.l === 1 ? `${item(r)?.ativo} · ${r._data.classe}` : r._data.classe; },
+        label: c => { const r = c.raw; const v = r.l === 1 ? item(r)?.valor : totClasse(r._data.classe); return ` ${brl(v)} · ${pctAbs(v / total * 100)} da carteira`; },
+        afterLabel: c => { const it = c.raw.l === 1 ? item(c.raw) : null; return it && it.membros.length > 1 ? it.membros.slice(0, 12).map(m => `  ${m}`).join("\n") + (it.membros.length > 12 ? `\n  +${it.membros.length - 12}` : "") : ""; },
       } }) },
     },
   }));
@@ -525,7 +566,7 @@ function renderContrib(P) {
     options: {
       ...base(), indexAxis: "y", layout: { padding: { right: 8 } },
       onClick: (_, els) => { if (els.length) { const r = rows[els[0].index]; setFiltro(r.classe, r.label); } },
-      scales: { x: { display: false, min: Math.min(0, ...rows.map(r => r.v)) * 1.45, max: Math.max(0, ...rows.map(r => r.v)) * 1.3 }, y: { grid: { display: false }, border: { display: false }, ticks: { color: css("--ink-2"), font: { size: 11 } } } },
+      scales: { x: { display: false, min: Math.min(0, ...rows.map(r => r.v)) * 1.9, max: Math.max(0, ...rows.map(r => r.v)) * 1.3 }, y: { grid: { display: false }, border: { display: false }, ticks: { color: css("--ink-2"), font: { size: 11 } } } },
       plugins: { legend: { display: false }, tooltip: tip({ callbacks: { title: c => rows[c[0].dataIndex].label, label: c => ` ${brlS(c.raw)} · ${rows[c.dataIndex].classe}` } }) },
     },
     plugins: [endLabels(v => brlS(v))],
@@ -697,6 +738,9 @@ function init() {
   initPeriodo(); initPos();
   document.querySelectorAll("[data-evo]").forEach(b => b.addEventListener("click", () => {
     est.evo = b.dataset.evo; document.querySelectorAll("[data-evo]").forEach(x => x.setAttribute("aria-pressed", x === b)); render();
+  }));
+  document.querySelectorAll("[data-tree]").forEach(b => b.addEventListener("click", () => {
+    est.tree = b.dataset.tree; document.querySelectorAll("[data-tree]").forEach(x => x.setAttribute("aria-pressed", x === b)); render();
   }));
   document.getElementById("tema").addEventListener("click", () => {
     const dark = matchMedia("(prefers-color-scheme: dark)").matches;
