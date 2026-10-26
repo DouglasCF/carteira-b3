@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parent.parent
 BASE = Path(os.environ.get("CARTEIRA_HOME", ROOT)).expanduser().resolve()
 DIR_B3 = BASE / "dados" / "b3"
 DIR_MENSAL = BASE / "dados" / "mensal"
+ALVO = BASE / "dados" / "alvo.json"
+SETORES_USUARIO = BASE / "dados" / "setores.json"
 SAIDA = BASE / "relatorios" / "data.js"
 CACHE = ROOT / "cache"
 SEM_MERCADO = os.environ.get("CARTEIRA_SEM_MERCADO") == "1"

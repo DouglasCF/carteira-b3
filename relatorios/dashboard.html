@@ -36,6 +36,7 @@
   --pos:#3987e5; --neg:#e66767; --good-text:#0ca30c;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin:0; background:var(--page); color:var(--ink); font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; }
 main { max-width: 1240px; margin: 0 auto; padding: 0 16px 64px; }
 header { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; padding: 24px 0 12px; }
@@ -75,6 +76,7 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--surface); bor
 .alerts .serious .ic { background: var(--serious); }
 .alerts .warning .ic { background: var(--warning); color:#0b0b0b; }
 .alerts .info .ic { background: var(--muted); }
+.alerts .good .ic { background: var(--good); }
 .alerts small { color: var(--ink-2); display:block; }
 .tbl-wrap { overflow: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -90,6 +92,19 @@ tr.sel td { background: var(--surface-2); font-weight: 600; }
 tr.total td { font-weight: 600; border-top: 1px solid var(--axis); }
 .dot { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:6px; }
 .pill { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--ink-2); }
+.ponte { display:flex; flex-wrap:wrap; gap: 8px 32px; margin: 12px 0; }
+.ponte .label { color: var(--ink-2); font-size: 12px; }
+.ponte .value { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lead { margin: 0 0 12px; max-width: 920px; }
+.campo { display:flex; gap: 6px; align-items:center; color: var(--ink-2); font-size: 12px; }
+.campo input { width: 130px; text-align: right; }
+details summary { cursor: pointer; color: var(--ink-2); margin: 12px 0 8px; }
+h3 { font-size: 14px; margin: 0 0 6px; }
+.ed input[type=number] { width: 76px; text-align: right; padding: 3px 6px; }
+.ed tr.cls td { background: var(--surface-2); font-weight: 600; }
+button.mini { font-size: 11px; padding: 2px 8px; }
+.sim-pesos { display:flex; flex-wrap:wrap; gap: 8px 18px; margin: 12px 0; }
+.sim-pesos .campo input { width: 72px; }
 footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
 footer li { margin-bottom: 4px; }
 @media (max-width: 600px) { .tile .value { font-size: 22px; } .periodo .resumo { margin-left: 0; width: 100%; } }
@@ -102,9 +117,13 @@ footer li { margin-bottom: 4px; }
       <h1>Carteira de investimentos</h1>
       <p class="sub" id="subtitulo"></p>
     </div>
-    <button id="tema" type="button" aria-label="Alternar tema claro/escuro">◐ Tema</button>
+    <div class="row" style="margin:0">
+      <div class="seg" role="tablist" aria-label="Página"><button type="button" role="tab" data-aba="carteira">Carteira</button><button type="button" role="tab" data-aba="simulador">Simulador</button></div>
+      <button id="tema" type="button" aria-label="Alternar tema claro/escuro">◐ Tema</button>
+    </div>
   </header>
 
+  <div id="abaCarteira">
   <nav class="periodo" aria-label="Período">
     <div class="grp seg" id="presets">
       <button type="button" data-preset="mes">Último mês</button>
@@ -146,15 +165,15 @@ footer li { margin-bottom: 4px; }
 
   <section class="grid g-2">
     <div class="card">
-      <h2>Desempenho por tipo de ativo</h2>
-      <p class="hint">Rentabilidade no período contra o benchmark de cada classe.</p>
-      <div class="tbl-wrap"><table id="tClasse"></table></div>
-    </div>
-    <div class="card">
       <h2>De onde veio o ganho</h2>
       <p class="hint">Ganho em R$ de cada tipo de ativo, mês a mês (inclui proventos).</p>
       <div class="legend" id="lgGanho"></div>
       <div class="chart" style="height:280px"><canvas id="cGanho"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Quem mais ajudou e atrapalhou</h2>
+      <p class="hint">Ganho no período por ativo, em R$ (preço + proventos, já descontados aportes).</p>
+      <div class="chart" id="contribWrap"><canvas id="cContrib"></canvas></div>
     </div>
   </section>
 
@@ -169,13 +188,41 @@ footer li { margin-bottom: 4px; }
     <div class="chart" style="height:480px"><canvas id="cTree"></canvas></div>
   </section>
 
-  <section class="grid g-2">
-    <div class="card">
-      <div class="row">
-        <div><h2>Quem mais ajudou e atrapalhou</h2><p class="hint" style="margin:0">Ganho no período por ativo, em R$ (preço + proventos, já descontados aportes).</p></div>
-      </div>
-      <div class="chart" id="contribWrap"><canvas id="cContrib"></canvas></div>
+  <section class="card" style="margin-bottom:16px">
+    <div class="row">
+      <div><h2>Concentração por setor</h2><p class="hint" style="margin:0" id="setorHint"></p></div>
+      <span class="spacer"></span>
+      <div class="seg" id="setorSeg"></div>
     </div>
+    <div class="chart" id="setorWrap" style="margin-top:8px"><canvas id="cSetor"></canvas></div>
+  </section>
+
+  <section class="card" style="margin-bottom:16px">
+    <h2>Diagnóstico do período</h2>
+    <p class="hint" style="margin:0">Por que a carteira rendeu o que rendeu: cada tipo de ativo comparado com o CDI e com o próprio índice.</p>
+    <div class="ponte" id="ponte"></div>
+    <p class="lead" id="diagLead"></p>
+    <ul class="alerts" id="insights"></ul>
+    <h3 style="margin-top:20px">Desempenho e atribuição por tipo de ativo</h3>
+    <p class="hint"><b>Alocação</b>: quanto o índice da classe rendeu acima ou abaixo do CDI, vezes o peso dela (efeito do mercado). <b>Seleção</b>: quanto os seus ativos renderam acima ou abaixo do índice, vezes o peso (efeito das suas escolhas). Em pontos percentuais da carteira. Clique numa linha para ver as posições.</p>
+    <div class="tbl-wrap"><table id="tClasse"></table></div>
+  </section>
+
+  <section class="card" style="margin-bottom:16px">
+    <div class="row">
+      <div><h2>Carteira ideal e rebalanceamento</h2><p class="hint" style="margin:0" id="alvoHint"></p></div>
+      <span class="spacer"></span>
+      <div class="row" id="alvoCtl" style="margin:0">
+        <label class="campo" for="aporte">Aporte do próximo mês <input id="aporte" type="number" min="0" step="500" inputmode="numeric"></label>
+        <div class="seg"><button type="button" data-rebal="aporte" aria-pressed="true">Só com aportes</button><button type="button" data-rebal="completo" aria-pressed="false">Vendendo o excesso</button></div>
+      </div>
+      <button type="button" id="btnEditar" aria-pressed="false">✎ Editar alvo</button>
+    </div>
+    <div id="alvoEdit" hidden></div>
+    <div id="alvoBody"></div>
+  </section>
+
+  <section class="grid g-2">
     <div class="card">
       <h2>Proventos</h2>
       <p class="hint" id="provHint"></p>
@@ -183,6 +230,11 @@ footer li { margin-bottom: 4px; }
       <div class="chart" style="height:220px"><canvas id="cProv"></canvas></div>
       <h2 style="margin-top:16px">Maiores pagadores no período</h2>
       <div class="tbl-wrap" style="max-height:220px"><table id="tProv"></table></div>
+    </div>
+    <div class="card">
+      <h2>Pontos de atenção</h2>
+      <p class="hint">Na posição do fim do período.</p>
+      <ul class="alerts" id="alerts"></ul>
     </div>
   </section>
 
@@ -192,17 +244,10 @@ footer li { margin-bottom: 4px; }
     <div class="tbl-wrap"><table id="tMeses"></table></div>
   </section>
 
-  <section class="grid g-2">
-    <div class="card">
-      <div class="row"><h2 style="margin:0">Movimentações</h2><span class="spacer"></span><select id="fMov" aria-label="Tipo de movimentação"></select></div>
-      <p class="hint">Compras e vendas vêm da B3. Aplicações, resgates e vencimentos de renda fixa são deduzidos comparando os meses.</p>
-      <div class="tbl-wrap" style="max-height:360px"><table id="tMov"></table></div>
-    </div>
-    <div class="card">
-      <h2>Pontos de atenção</h2>
-      <p class="hint">Na posição do fim do período.</p>
-      <ul class="alerts" id="alerts"></ul>
-    </div>
+  <section class="card" style="margin-bottom:16px">
+    <div class="row"><h2 style="margin:0">Movimentações</h2><span class="spacer"></span><select id="fMov" aria-label="Tipo de movimentação"></select></div>
+    <p class="hint">Compras e vendas vêm da B3. Aplicações, resgates e vencimentos de renda fixa são deduzidos comparando os meses.</p>
+    <div class="tbl-wrap" style="max-height:360px"><table id="tMov"></table></div>
   </section>
 
   <section class="card">
@@ -216,13 +261,26 @@ footer li { margin-bottom: 4px; }
     </div>
     <div class="tbl-wrap" style="max-height:600px"><table id="tPos"></table></div>
   </section>
+  </div>
+
+  <div id="abaSimulador" hidden>
+  <section class="card" style="margin:16px 0">
+    <div class="row">
+      <div><h2>Simulador de alocação</h2><p class="hint" style="margin:0" id="simHint"></p></div>
+      <span class="spacer"></span>
+      <div class="seg" id="simJanela"></div>
+    </div>
+    <div id="simBody"></div>
+  </section>
+  </div>
 
   <footer><ul id="notas"></ul></footer>
 </main>
 
 <script>
 const D = window.DATA;
-const CLASSES = ["Ações Brasil", "BDRs (ações globais)", "ETFs", "FIIs", "Renda fixa (CDB/LCA)", "Tesouro Direto", "Crédito privado"];
+const EXTERIOR = "Exterior (BDRs e ETFs)";
+const CLASSES = ["Ações Brasil", EXTERIOR, "FIIs", "Cripto", "Renda fixa (CDB/LCA)", "Tesouro Direto", "Crédito privado"];
 const LISTADAS = CLASSES.slice(0, 4);
 const BENCH = [["Carteira", "--ink"], ["CDI", "--s6"], ["Ibovespa", "--s1"], ["IPCA", "--s4"], ["IFIX", "--s5"], ["S&P 500 (R$)", "--s2"], ["Dólar", "--s7"]];
 const TIPOS_PROV = ["Rendimento", "Dividendo", "Juros Sobre Capital Próprio", "Reembolso"];
@@ -255,7 +313,7 @@ const nomeDe = (() => {
 })();
 
 // ---------------------------------------------------------------- estado
-const est = { ini: 1, fim: MESES.length - 1, evo: "brl", tree: "destaque", classeFiltro: null, ativoFiltro: null, ocultos: new Set(["Dólar"]) };
+const est = { ini: 1, fim: MESES.length - 1, evo: "brl", tree: "destaque", classeFiltro: null, ativoFiltro: null, ocultos: new Set(["Dólar"]), aporte: null, rebal: "aporte", setor: "rv", editando: false };
 let charts = [];
 
 function periodo() {
@@ -449,23 +507,725 @@ function renderAcum(P) {
   }));
 }
 
-// ---------------------------------------------------------------- por classe
-function renderClasse(P) {
+// ---------------------------------------------------------------- setores
+const SETOR = D.setores || {};
+const GRUPO = { "Bancos": "Financeiro", "Seguros": "Financeiro", "Serviços financeiros": "Financeiro", "Energia elétrica": "Energia e saneamento", "Saneamento": "Energia e saneamento", "Siderurgia": "Mineração e metais" };
+const setorDe = t => SETOR[t] || "Sem classificação";
+const grupoDe = s => s.startsWith("FII ") || s === "Fiagro" ? "Imobiliário (FIIs)" : GRUPO[s] || s;
+function agrupar(ps, chave) {
+  const g = {};
+  ps.forEach(p => {
+    const x = g[chave(p)] ??= { nome: chave(p), valor: 0, t: {}, pc: {}, classes: new Set() };
+    x.valor += p.valor; x.t[p.ticker] = (x.t[p.ticker] || 0) + p.valor; x.pc[p.classe] = (x.pc[p.classe] || 0) + p.valor; x.classes.add(p.classe);
+  });
+  return Object.values(g).map(x => ({ ...x, tickers: Object.entries(x.t).sort((a, b) => b[1] - a[1]) })).sort((a, b) => b.valor - a.valor);
+}
+let setorChart = null;
+function renderSetor(P) {
+  const rv = P.fim.posicoes.filter(p => LISTADAS.includes(p.classe) && p.valor > 0);
+  const escopos = [["rv", "Toda a renda variável"], ...LISTADAS.filter(c => rv.some(p => p.classe === c)).map(c => [c, c.replace(" (BDRs e ETFs)", "")])];
+  if (!escopos.some(([k]) => k === est.setor)) est.setor = "rv";
+  const seg = document.getElementById("setorSeg");
+  seg.innerHTML = escopos.map(([k, l]) => `<button type="button" data-setor="${esc(k)}" aria-pressed="${k === est.setor}">${esc(l)}</button>`).join("");
+  seg.querySelectorAll("[data-setor]").forEach(b => b.addEventListener("click", () => { est.setor = b.dataset.setor; renderSetor(periodo()); }));
+  const todo = est.setor === "rv";
+  const ps = todo ? rv : rv.filter(p => p.classe === est.setor);
+  const ref = todo ? P.fim.patrimonio : soma(ps, p => p.valor);
+  const g = agrupar(ps, p => todo ? grupoDe(setorDe(p.ticker)) : setorDe(p.ticker).replace(/^FII /, ""));
+  document.getElementById("setorHint").textContent = todo
+    ? "Ações, exterior, FIIs e cripto por setor, em % da carteira toda. Bancos, seguros e B3 viram Financeiro; energia e saneamento ficam juntos. Cor: tipo de ativo."
+    : `Em % de ${est.setor}.` + (est.setor === "FIIs" ? " Papel = recebíveis (CRIs); tijolo = logística, shoppings, lajes, renda urbana." : "") + " Setores de scripts/setores.py; ajuste em dados/setores.json.";
+  const classes = LISTADAS.filter(c => ps.some(p => p.classe === c));
+  document.getElementById("setorWrap").style.height = `${g.length * 26 + 30}px`;
+  if (setorChart) { setorChart.destroy(); charts = charts.filter(c => c !== setorChart); }
+  const max = Math.max(...g.map(x => x.valor / ref * 100), 1);
+  setorChart = new Chart(document.getElementById("cSetor"), {
+    type: "bar",
+    data: { labels: g.map(x => x.nome), datasets: classes.map(c => ({ label: c, data: g.map(x => (x.pc[c] || 0) / ref * 100), backgroundColor: corClasse(c), borderColor: css("--surface"), borderWidth: { right: 1 }, borderSkipped: false, borderRadius: 2, barPercentage: 0.75 })) },
+    options: {
+      ...base(), indexAxis: "y", layout: { padding: { right: 8 } },
+      scales: { x: { display: false, stacked: true, max: max * 1.15 }, y: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { color: css("--ink-2"), font: { size: 11 } } } },
+      plugins: { legend: { display: false }, tooltip: tip({ filter: c => c.raw > 0, callbacks: {
+        label: c => ` ${c.dataset.label}: ${pctAbs(c.raw)}`,
+        afterBody: c => g[c[0].dataIndex].tickers.slice(0, 10).map(([t, v]) => `  ${t} ${pctAbs(v / ref * 100)}`).join("\n"),
+      } }) },
+    },
+    plugins: [{
+      id: "totais",
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart; ctx.save();
+        ctx.font = '11px system-ui,-apple-system,"Segoe UI",sans-serif'; ctx.fillStyle = css("--ink-2"); ctx.textBaseline = "middle";
+        g.forEach((x, i) => { const v = x.valor / ref * 100; ctx.fillText(pctAbs(v), chart.scales.x.getPixelForValue(v) + 6, chart.getDatasetMeta(0).data[i].y); });
+        ctx.restore();
+      },
+    }],
+  });
+  charts.push(setorChart);
+}
+
+// ---------------------------------------------------------------- diagnóstico
+const num = (v, d = 1) => v == null || !isFinite(v) ? "—" : (v = +v.toFixed(d) || 0, `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d })}`);
+const pp = (v, d = 1) => v == null || !isFinite(v) ? "—" : `${num(v, d)} p.p.`;
+const ppAbs = v => `${Math.abs(v).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} p.p.`;
+const cadeiaCompleta = s => s && s.length && s.every(v => v != null) ? cadeia(s) : null;
+function ganhoPorAtivo(P) {
+  const g = {};
+  P.meses.forEach(m => Object.entries(m.ganho_ativo || {}).forEach(([id, v]) => g[id] = (g[id] || 0) + v));
+  return Object.entries(g).map(([id, v]) => ({ id, v, ...nomeDe(id) }));
+}
+
+// atribuição contra o CDI: alocação = peso × (índice da classe − CDI); seleção = peso × (classe − índice)
+function atribuicao(P) {
+  const cdi = cadeiaCompleta(P.bench.CDI);
+  const bases = P.meses.map(m => m.resumo.inicial + m.resumo.fluxo / 2);
   const linhas = CLASSES.map(c => {
-    const ms = P.meses.map(m => m.classes[c]).filter(Boolean);
-    if (!ms.length) return null;
-    const ganho = soma(ms, x => x.ganho);
-    const rent = ms.some(x => x.rent != null) ? cadeia(ms.map(x => x.rent)) : null;
+    const ms = P.meses.map(m => m.classes[c]);
+    if (!ms.some(Boolean)) return null;
+    const w = soma(ms.map((x, i) => x && bases[i] > 1 ? (x.inicial + x.fluxo / 2) / bases[i] : 0)) / P.meses.length;
+    const rent = ms.some(x => x?.rent != null) ? cadeia(ms.map(x => x?.rent ?? 0)) : null;
     const bn = D.bench_classe[c];
-    const bench = bn ? cadeia(P.bench[bn] || []) : null;
-    return { c, ganho, rent, bn, bench, fim: P.fim.posicoes.filter(p => p.classe === c).reduce((s, p) => s + p.valor, 0) };
+    const bench = bn ? cadeiaCompleta(P.bench[bn]) : rent;
+    return {
+      c, w, rent, bn, bench,
+      ganho: soma(ms, x => x?.ganho ?? 0), prov: soma(ms, x => x?.proventos ?? 0),
+      fim: soma(P.fim.posicoes.filter(p => p.classe === c), p => p.valor),
+      vsCdi: rent != null && cdi != null ? w * (rent - cdi) : null,
+      aloc: bench != null && cdi != null ? w * (bench - cdi) : null,
+      sel: bench != null && rent != null ? w * (rent - bench) : null,
+    };
   }).filter(l => l && (l.fim > 0.5 || Math.abs(l.ganho) > 0.5));
+  const pesoTot = soma(linhas, l => l.w);
+  const composto = linhas.length && linhas.every(l => l.bench != null) && pesoTot > 0 ? soma(linhas, l => l.w * l.bench) / pesoTot : null;
+  return { linhas, cdi, composto, rent: cadeia(P.meses.map(m => m.resumo.rent)) };
+}
+
+function insights(P, A) {
+  const out = [];  // [estilo, ícone, título, texto, relevância em p.p.]
+  const ativos = ganhoPorAtivo(P);
+  const destaques = (c, sinal) => ativos.filter(a => a.classe === c && Math.sign(a.v) === sinal)
+    .sort((a, b) => sinal * (b.v - a.v)).slice(0, 3).map(a => `${a.label} ${brlS(a.v)}`).join(", ") || "—";
+  A.linhas.forEach(l => {
+    if (l.sel != null && Math.abs(l.sel) >= 0.5) {
+      const neg = l.sel < 0;
+      out.push([neg ? "serious" : "good", neg ? "↓" : "↑", `${l.c}: seus ativos ${neg ? "ficaram atrás do" : "bateram o"} ${l.bn} (${pct(l.rent)} contra ${pct(l.bench)})`,
+        `A escolha dos ativos ${neg ? "custou" : "somou"} ${ppAbs(l.sel)} na carteira. ${neg ? "Maiores perdas" : "Destaques"}: ${destaques(l.c, neg ? -1 : 1)}.`, Math.abs(l.sel)]);
+    }
+    if (l.aloc != null && Math.abs(l.aloc) >= 0.5 && !l.bn) {
+      const neg = l.aloc < 0;
+      out.push([neg ? "warning" : "good", neg ? "↓" : "↑", `${l.c}: rendeu ${pct(l.rent)} contra ${pct(A.cdi)} do CDI`,
+        `Com ${pctAbs(l.w * 100, 0)} da carteira nessa classe, ela ${neg ? "tirou" : "somou"} ${ppAbs(l.aloc)} da carteira.`, Math.abs(l.aloc)]);
+    } else if (l.aloc != null && Math.abs(l.aloc) >= 0.5) {
+      const neg = l.aloc < 0;
+      out.push([neg ? "warning" : "good", neg ? "↓" : "↑", `${l.c}: o próprio ${l.bn} rendeu ${neg ? "menos" : "mais"} que o CDI (${pct(l.bench)} contra ${pct(A.cdi)})`,
+        `Com ${pctAbs(l.w * 100, 0)} da carteira nessa classe, o mercado dela ${neg ? "tirou" : "somou"} ${ppAbs(l.aloc)} da carteira. É efeito de alocação: aconteceria com qualquer ativo da classe.`, Math.abs(l.aloc)]);
+    }
+  });
+  const bdr = A.linhas.find(l => l.c === EXTERIOR);
+  const dol = cadeiaCompleta(P.bench["Dólar"]);
+  if (bdr && bdr.w > 0.05 && dol != null && Math.abs(dol) >= 2)
+    out.push([dol < 0 ? "warning" : "good", "$", `Dólar ${pct(dol)} no período`,
+      `BDRs e ETFs de fora são cotados em dólar e convertidos em reais. Com ${pctAbs(bdr.w * 100, 0)} da carteira no exterior, o câmbio sozinho ${dol < 0 ? "tirou" : "somou"} cerca de ${ppAbs(bdr.w * dol)} da carteira.`, Math.abs(bdr.w * dol)]);
+  A.linhas.filter(l => l.prov > 0 && l.fim > 0 && l.ganho - l.prov < -0.5 * l.prov).forEach(l => {
+    const queda = l.prov - l.ganho;
+    out.push(["warning", "R$", `${l.c}: ${brl(l.prov)} em proventos, mas ${brl(queda)} de queda nos preços`,
+      l.ganho < 0 ? `Os proventos não cobriram a desvalorização: o ganho total da classe foi ${brlS(l.ganho)}.` : `Os proventos cobriram a queda, mas sobrou pouco: ganho total de ${brlS(l.ganho)}.`,
+      queda / (P.base.patrimonio || 1) * 100]);
+  });
+  const total = P.fim.patrimonio, pos = {};
+  P.fim.posicoes.filter(p => p.valor > 0).forEach(p => {
+    const rv = p.id.startsWith("RV:");
+    (pos[rv ? p.ticker : p.id] ??= { valor: 0, rv, venc: p.vencimento, rotulo: rv ? p.ticker : p.nome }).valor += p.valor;
+  });
+  const peq = Object.values(pos).filter(x => x.valor / total < 0.005);
+  if (peq.length >= 10) {
+    const rf = peq.filter(x => !x.rv), rvp = peq.filter(x => x.rv).sort((a, b) => a.valor - b.valor);
+    const em12 = new Date(Date.parse(fimDoMes(P.fim.mes)) + 365 * 864e5).toISOString().slice(0, 10);
+    const custo = soma(rvp, x => Math.max(0, total * 0.01 - x.valor));
+    const aporteMes = est.aporte ?? alvoEfetivo()?.aporte_mensal;
+    const partes = [];
+    if (rf.length) partes.push(`${rf.length} são renda fixa (${brl(soma(rf, x => x.valor))}): não precisa vender, deixe vencer e reaplique num título só (${rf.filter(x => x.venc && x.venc <= em12).length} vencem nos próximos 12 meses).`);
+    if (rvp.length) partes.push(`${rvp.length} são de renda variável (${rvp.slice(0, 5).map(x => x.rotulo).join(", ")}${rvp.length > 5 ? "…" : ""}): leve cada uma a pelo menos 1% da carteira ou zere o alvo e venda aos poucos. Levar todas a 1% custaria ${brl(custo)}${aporteMes ? ` (≈ ${Math.ceil(custo / aporteMes)} meses de aporte)` : ""}; no editor do alvo, “Zerar < 1%” faz a limpeza por classe.`);
+    out.push(["info", "i", `${peq.length} de ${Object.keys(pos).length} posições têm menos de 0,5% da carteira cada (somam ${pctAbs(soma(peq, x => x.valor) / total * 100)})`,
+      `Uma posição de 0,5% que dobra de preço mexe só 0,5 p.p. na carteira. ${partes.join(" ")}`, 0.45]);
+  }
+  const rvPos = P.fim.posicoes.filter(p => LISTADAS.includes(p.classe) && p.valor > 0);
+  ["Ações Brasil", EXTERIOR, "FIIs"].forEach(c => {
+    const ps = rvPos.filter(p => p.classe === c), tc = soma(ps, p => p.valor);
+    if (tc / total < 0.05) return;
+    if (c === "FIIs") {
+      const g = agrupar(ps, p => setorDe(p.ticker));
+      const tipo = s => s === "FII Recebíveis (papel)" ? "papel" : ["FII Fundo de fundos", "FII Híbrido", "Fiagro", "Sem classificação"].includes(s) ? "outros" : "tijolo";
+      const por = { papel: 0, tijolo: 0, outros: 0 };
+      g.forEach(x => por[tipo(x.nome)] += x.valor);
+      return void out.push([g[0].valor / tc >= 0.4 ? "warning" : "info", "▦", `FIIs: ${pctAbs(por.papel / tc * 100, 0)} papel, ${pctAbs(por.tijolo / tc * 100, 0)} tijolo, ${pctAbs(por.outros / tc * 100, 0)} híbridos e fundos de fundos`,
+        `${g.slice(0, 4).map(x => `${x.nome.replace(/^FII /, "")} ${pctAbs(x.valor / tc * 100, 0)} (${x.tickers.map(([t]) => t).join(", ")})`).join(" · ")}. Papel acompanha CDI/IPCA e corre risco de crédito; tijolo vive de aluguel e vacância e tende a valorizar quando os juros caem.`, 0.45]);
+    }
+    const g = agrupar(ps, p => grupoDe(setorDe(p.ticker)));
+    if (g[0].valor / tc >= 0.3)
+      out.push(["warning", "▦", `${c}: ${pctAbs(g[0].valor / tc * 100, 0)} em ${g[0].nome}`,
+        `${g[0].tickers.slice(0, 5).map(([t, v]) => `${t} ${pctAbs(v / tc * 100, 0)}`).join(", ")}. Um choque no setor (juros, regulação, preço de commodity) atinge todos de uma vez.${g[1] ? ` Depois vem ${g[1].nome} (${pctAbs(g[1].valor / tc * 100, 0)}).` : ""}`, 0.45]);
+  });
+  agrupar(rvPos, p => grupoDe(setorDe(p.ticker))).filter(x => x.classes.size >= 2 && x.valor / total >= 0.08 && !x.nome.startsWith("Índice"))
+    .forEach(x => out.push(["info", "▦", `${x.nome} soma ${pctAbs(x.valor / total * 100, 0)} da carteira, espalhado entre ${[...x.classes].join(" e ")}`,
+      `${x.tickers.slice(0, 6).map(([t, v]) => `${t} ${pctAbs(v / total * 100)}`).join(", ")}. Olhando classe por classe essa concentração não aparece.`, 0.44]));
+  const sem = [...new Set(rvPos.filter(p => !SETOR[p.ticker]).map(p => p.ticker))];
+  if (sem.length) out.push(["info", "?", `${sem.length} ativo(s) sem setor`, `${sem.join(", ")}: classifique em dados/setores.json para entrarem na análise de concentração.`, 0.1]);
+  const quebradas = checarRegras(P, alvoEfetivo()).lista;
+  if (quebradas.length)
+    out.push(["serious", "!", `${quebradas.length} regra(s) da sua política quebrada(s)`,
+      `${quebradas.slice(0, 3).map(r => r.titulo).join(" · ")}${quebradas.length > 3 ? " · …" : ""}. O que fazer está em Carteira ideal.`, 0.46]);
+  const ibov = cadeiaCompleta(P.bench.Ibovespa);
+  const wBr = soma(A.linhas.filter(l => l.c === "Ações Brasil"), l => l.w);
+  if (ibov != null && A.composto != null && wBr < 0.5)
+    out.push(["info", "i", `Só ${pctAbs(wBr * 100, 0)} da carteira está em ações brasileiras`,
+      `Comparar com o Ibovespa (${pct(ibov)}) engana. A régua justa é o benchmark composto (${pct(A.composto)}): cada classe pelo seu índice, com os seus pesos.`, 0.3]);
+  return out.sort((a, b) => b[4] - a[4]);
+}
+
+function renderDiag(P) {
+  const A = atribuicao(P);
+  const ibov = cadeiaCompleta(P.bench.Ibovespa), ipca = cadeiaCompleta(P.bench.IPCA);
+  document.getElementById("ponte").innerHTML = [
+    ["Carteira", A.rent], ["Benchmark composto", A.composto], ["CDI", A.cdi], ["Ibovespa", ibov], ["IPCA", ipca],
+  ].map(([l, v], i) => `<div><div class="label">${l}</div><div class="value ${i ? "" : cls(v)}">${pct(v, 2)}</div></div>`).join("");
+
+  const alocT = soma(A.linhas, l => l.aloc ?? 0), selT = soma(A.linhas, l => l.sel ?? 0);
+  const lead = document.getElementById("diagLead");
+  if (A.cdi == null) lead.textContent = "Sem CDI para o período (os benchmarks não foram baixados): rode scripts/gerar.py com internet para ver o diagnóstico.";
+  else {
+    const dif = A.rent - A.cdi, resid = dif - alocT - selT;
+    lead.innerHTML = `A carteira rendeu <b>${pct(A.rent, 2)}</b>, <b>${ppAbs(dif)} ${dif < 0 ? "abaixo" : "acima"}</b> do CDI.` + (A.composto == null ? "" :
+      ` Desse resultado, <b>${pp(alocT)}</b> vêm da <b>alocação</b> (como renderam os mercados em que você está) e <b>${pp(selT)}</b> da <b>seleção</b> (seus ativos contra o índice de cada classe)` +
+      (Math.abs(resid) >= 0.3 ? `; ${pp(resid)} são efeito de encadear os meses e do momento dos aportes.` : "."));
+  }
+  const ins = A.cdi == null ? [] : insights(P, A);
+  document.getElementById("insights").innerHTML = ins.length
+    ? ins.map(([c, ic, t, s]) => `<li class="${c}"><span class="ic" aria-hidden="true">${ic}</span><div><strong>${esc(t)}</strong><small>${esc(s)}</small></div></li>`).join("")
+    : `<li class="info"><span class="ic">✓</span><div><strong>Nada fora do esperado</strong><small>Nenhuma classe se afastou mais de 0,5 p.p. do CDI ou do próprio índice.</small></div></li>`;
+
+  const td = (v, f = pp) => `<td class="n ${cls(v)}">${f(v)}</td>`;
   document.getElementById("tClasse").innerHTML =
-    `<thead><tr><th>Tipo</th><th class="n">Ganho</th><th class="n">Rent.</th><th class="n">Benchmark</th><th class="n">Diferença</th></tr></thead><tbody>` +
-    linhas.map(l => `<tr class="click" data-classe="${esc(l.c)}"><td><span class="dot" style="background:${corClasse(l.c)}"></span>${esc(l.c)}</td><td class="n ${cls(l.ganho)}">${brlS(l.ganho)}</td><td class="n ${cls(l.rent)}">${pct(l.rent)}</td><td class="n">${l.bn ? `${esc(l.bn)} ${pct(l.bench)}` : "—"}</td><td class="n ${cls(l.rent - l.bench)}">${l.rent == null || l.bench == null ? "—" : `${pct(l.rent - l.bench)} p.p.`}</td></tr>`).join("") +
-    `</tbody>`;
+    `<thead><tr><th>Tipo</th><th class="n">Peso médio</th><th class="n">Ganho</th><th class="n">Rent.</th><th class="n">Índice</th><th class="n">Rent. − índice</th><th class="n">Alocação</th><th class="n">Seleção</th><th class="n">Efeito vs CDI</th></tr></thead><tbody>` +
+    A.linhas.map(l => `<tr class="click" data-classe="${esc(l.c)}"><td><span class="dot" style="background:${corClasse(l.c)}"></span>${esc(l.c)}</td><td class="n">${pctAbs(l.w * 100)}</td>${td(l.ganho, brlS)}${td(l.rent, pct)}<td class="n">${l.bn ? `${esc(l.bn)} ${pct(l.bench)}` : "sem índice"}</td>${td(l.bn && l.rent != null && l.bench != null ? l.rent - l.bench : null)}${td(l.aloc)}${td(l.sel)}${td(l.vsCdi)}</tr>`).join("") +
+    `<tr class="total"><td>Carteira</td><td class="n">100%</td>${td(soma(A.linhas, l => l.ganho), brlS)}${td(A.rent, pct)}<td class="n">Composto ${pct(A.composto)}</td>${td(A.composto == null ? null : A.rent - A.composto)}${td(A.composto == null ? null : alocT)}${td(A.composto == null ? null : selT)}${td(A.cdi == null ? null : A.rent - A.cdi)}</tr></tbody>`;
   document.querySelectorAll("#tClasse [data-classe]").forEach(tr => tr.addEventListener("click", () => setFiltro(tr.dataset.classe, null)));
 }
+
+// ---------------------------------------------------------------- carteira ideal: rascunho e editor
+// o dashboard não grava arquivos: o rascunho fica no navegador até ser exportado e importado com scripts/alvo.py --importar
+const SO_CLASSE = ["Renda fixa (CDB/LCA)", "Tesouro Direto", "Crédito privado"];
+const canon = a => JSON.stringify(a ? [Object.keys(a.classes || {}).sort().map(k => [k, a.classes[k].alvo, a.classes[k].ativos ? Object.entries(a.classes[k].ativos).sort() : null]), Object.entries(a.regras || {}).sort()] : null);
+let alvoRascunho = null;
+try { alvoRascunho = JSON.parse(localStorage.getItem("carteira.alvo")); } catch (e) {}
+if (alvoRascunho && canon(alvoRascunho) === canon(D.alvo)) alvoRascunho = null;  // já importado
+const alvoEfetivo = () => alvoRascunho || D.alvo;
+const rascunhoPendente = () => !!alvoRascunho && canon(alvoRascunho) !== canon(D.alvo);
+function salvarRascunho() {
+  try { rascunhoPendente() ? localStorage.setItem("carteira.alvo", JSON.stringify(alvoRascunho)) : localStorage.removeItem("carteira.alvo"); } catch (e) {}
+}
+function posicaoAtual(P) {
+  const atual = {};
+  P.fim.posicoes.filter(p => p.valor > 0).forEach(p => {
+    const c = atual[p.classe] ??= { valor: 0, ativos: {} };
+    const a = c.ativos[p.id.startsWith("RV:") ? p.ticker : p.nome] ??= { valor: 0, preco: p.preco };
+    c.valor += p.valor; a.valor += p.valor;
+  });
+  return atual;
+}
+// percentuais com 1 casa que somam exatamente 100 (maiores restos)
+function arred(pesos) {
+  const tot = soma(Object.values(pesos));
+  if (tot <= 0) return Object.fromEntries(Object.keys(pesos).map(k => [k, 0]));
+  const bruto = Object.entries(pesos).map(([k, v]) => [k, v / tot * 1000]);
+  const out = Object.fromEntries(bruto.map(([k, v]) => [k, Math.floor(v + 1e-9)]));
+  bruto.sort((a, b) => (b[1] % 1) - (a[1] % 1)).slice(0, 1000 - soma(Object.values(out))).forEach(([k]) => out[k]++);
+  return Object.fromEntries(Object.entries(out).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, v / 10]));
+}
+const valores = ativos => Object.fromEntries(Object.entries(ativos || {}).map(([k, x]) => [k, x.valor]));
+function alvoDaCarteira(P) {
+  const atual = posicaoAtual(P);
+  const pc = arred(Object.fromEntries(Object.entries(atual).map(([c, x]) => [c, x.valor])));
+  const classes = {};
+  CLASSES.filter(c => atual[c]).forEach(c => classes[c] = SO_CLASSE.includes(c) ? { alvo: pc[c] } : { alvo: pc[c], ativos: arred(valores(atual[c].ativos)) });
+  return { aporte_mensal: D.alvo?.aporte_mensal || 0, classes };
+}
+const somaClasses = A => soma(Object.values(A.classes), x => x.alvo || 0);
+// peso-alvo de um ativo na carteira toda, normalizando somas diferentes de 100
+const pesoNaCarteira = (A, c, v) => { const cfg = A.classes[c]; return (cfg.alvo || 0) / (somaClasses(A) || 100) * 100 * v / (soma(Object.values(cfg.ativos || {})) || 100); };
+
+function renderEditor(P) {
+  const el = document.getElementById("alvoEdit");
+  el.hidden = !est.editando || !alvoRascunho;
+  document.getElementById("btnEditar").setAttribute("aria-pressed", !el.hidden);
+  if (el.hidden) return;
+  const A = alvoRascunho, atual = posicaoAtual(P), total = P.fim.patrimonio;
+  const classes = CLASSES.filter(c => A.classes[c] || atual[c]);
+  const num = (v, campo, rotulo) => `<input type="number" min="0" max="100" step="0.5" value="${+(v || 0).toFixed(2)}" data-campo="${campo}" aria-label="${esc(rotulo)}">`;
+  const bloco = c => {
+    const cfg = A.classes[c] || {}, ac = atual[c] || { valor: 0, ativos: {} };
+    const acoes = !cfg.ativos ? (SO_CLASSE.includes(c) ? "" : `<button type="button" class="mini" data-acao="detalhar">Definir por ativo</button>`)
+      : `<button type="button" class="mini" data-acao="igualar">Igualar</button> <button type="button" class="mini" data-acao="atual">Usar atual</button> <button type="button" class="mini" data-acao="zerar" title="Zera o alvo dos ativos que ficariam com menos de 1% da carteira e redistribui entre os demais">Zerar &lt; 1%</button> <button type="button" class="mini" data-acao="sototal">Só o total</button>`;
+    const ks = cfg.ativos ? [...new Set([...Object.keys(cfg.ativos), ...Object.keys(ac.ativos)])].sort((a, b) => (cfg.ativos[b] || 0) - (cfg.ativos[a] || 0) || (ac.ativos[b]?.valor || 0) - (ac.ativos[a]?.valor || 0)) : [];
+    return `<tbody><tr class="cls" data-c="${esc(c)}"><td><span class="dot" style="background:${corClasse(c)}"></span>${esc(c)}</td><td class="n">${pctAbs(ac.valor / total * 100)}</td><td class="n">${num(cfg.alvo, "classe", `Alvo de ${c} na carteira`)}</td><td class="n" data-der="somaAtivos"></td><td>${acoes}</td></tr>` +
+      ks.map(t => `<tr data-c="${esc(c)}" data-t="${esc(t)}"><td style="padding-left:26px"><strong>${esc(t)}</strong> <span style="color:var(--muted)">${esc(setorDe(t).replace(/^FII /, ""))}</span>${cfg.ativos[t] == null ? ` <span class="pill">fora do alvo</span>` : ""}</td><td class="n">${ac.valor ? pctAbs((ac.ativos[t]?.valor || 0) / ac.valor * 100) : "—"}</td><td class="n">${num(cfg.ativos[t], "ativo", `Alvo de ${t} dentro da classe`)}</td><td class="n" data-der="cart"></td><td>${cfg.ativos[t] != null ? `<button type="button" class="mini" data-acao="remover" aria-label="Tirar ${esc(t)} do alvo">✕</button>` : ""}</td></tr>`).join("") +
+      (cfg.ativos ? `<tr data-c="${esc(c)}"><td colspan="5" style="padding-left:26px"><input type="text" data-campo="novo" placeholder="Ticker" size="9" aria-label="Novo ativo em ${esc(c)}" style="text-transform:uppercase"> <button type="button" class="mini" data-acao="adicionar">Adicionar</button></td></tr>` : "") + `</tbody>`;
+  };
+  const faltam = CLASSES.filter(c => !classes.includes(c));
+  el.innerHTML = `<div class="row" style="margin-top:12px"><span>Soma das classes: <b data-der="somaClasses"></b></span><span class="spacer"></span>
+      ${faltam.length ? `<select data-campo="novaClasse" aria-label="Adicionar classe"><option value="">Adicionar classe…</option>${faltam.map(c => `<option>${esc(c)}</option>`).join("")}</select>` : ""}
+      <button type="button" data-acao="atualTudo">Recomeçar da composição atual</button>
+      <button type="button" data-acao="exportar">Exportar alvo.json</button><button type="button" data-acao="copiar">Copiar JSON</button>
+      <button type="button" data-acao="descartar">Descartar rascunho</button></div>
+    <p class="hint">Classes em % da carteira; ativos em % <b>dentro da classe</b>. O rascunho fica neste navegador e já vale para as sugestões abaixo. Para salvar: <b>Exportar alvo.json</b> (vai para Downloads) e rode <code>scripts/alvo.py --importar</code> e <code>scripts/gerar.py</code>.</p>
+    <div class="row" style="gap:12px"><b style="font-size:12px">Regras (em %, vazio = sem regra)</b>${Object.entries(REGRAS).map(([k, [r, d]]) => `<label class="campo" title="${esc(d)}">${r} <input type="number" min="0" max="100" step="0.5" data-regra="${k}" value="${A.regras?.[k] ?? ""}" aria-label="${esc(d)}" style="width:70px"></label>`).join("")}</div>
+    <div class="tbl-wrap ed" style="max-height:560px"><table><thead><tr><th>Classe / ativo</th><th class="n">Atual</th><th class="n">Alvo (%)</th><th class="n">% da carteira</th><th></th></tr></thead>${classes.map(bloco).join("")}</table></div>`;
+  atualizarDerivados();
+}
+function atualizarDerivados() {
+  const el = document.getElementById("alvoEdit"), A = alvoRascunho;
+  if (!A || el.hidden) return;
+  const sc = somaClasses(A), ok = Math.abs(sc - 100) <= 0.05;
+  const s = el.querySelector('[data-der="somaClasses"]');
+  s.textContent = ok ? `${pctAbs(sc)} ✓` : `${pctAbs(sc)} (${sc < 100 ? "faltam" : "sobram"} ${pctAbs(Math.abs(100 - sc))})`;
+  s.className = ok ? "up" : "down";
+  el.querySelectorAll("tr.cls").forEach(tr => {
+    const cfg = A.classes[tr.dataset.c], d = tr.querySelector('[data-der="somaAtivos"]');
+    const sa = cfg?.ativos ? soma(Object.values(cfg.ativos)) : null;
+    d.textContent = sa == null ? "" : `ativos somam ${pctAbs(sa)}${Math.abs(sa - 100) <= 0.05 ? " ✓" : ""}`;
+    d.className = `n ${sa == null ? "" : Math.abs(sa - 100) <= 0.05 ? "up" : "down"}`;
+  });
+  el.querySelectorAll("tr[data-t]").forEach(tr => {
+    const w = pesoNaCarteira(A, tr.dataset.c, A.classes[tr.dataset.c].ativos[tr.dataset.t] || 0);
+    tr.querySelector('[data-der="cart"]').innerHTML = `${pctAbs(w, 2)}${w > 0 && w < 1 ? ` <span class="pill">&lt; 1%</span>` : ""}`;
+  });
+}
+const alvoParaArquivo = () => ({
+  _leia: "alvo = % da classe na carteira (soma 100); ativos = % dentro da classe (soma 100). Ativo fora de 'ativos' tem alvo 0. Classe sem 'ativos' rebalanceia só o total.",
+  aporte_mensal: est.aporte ?? alvoEfetivo().aporte_mensal ?? 0,
+  regras: alvoEfetivo().regras || {},
+  classes: alvoEfetivo().classes,
+});
+function exportarAlvo() {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(alvoParaArquivo(), null, 2) + "\n"], { type: "application/json" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: "alvo.json" });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function acaoEditor(acao, tr) {
+  const P = periodo(), A = alvoRascunho, c = tr?.dataset.c, cfg = c && A.classes[c];
+  if (acao === "remover") delete cfg.ativos[tr.dataset.t];
+  else if (acao === "adicionar") {
+    const t = tr.querySelector("input").value.trim().toUpperCase();
+    if (!/^[A-Z0-9]{4,7}$/.test(t)) return;
+    cfg.ativos[t] ??= 0;
+  } else if (acao === "igualar") cfg.ativos = arred(Object.fromEntries(Object.keys(cfg.ativos).map(k => [k, 1])));
+  else if (acao === "atual" || acao === "detalhar") cfg.ativos = arred(valores(posicaoAtual(P)[c]?.ativos));
+  else if (acao === "zerar") {
+    const fica = Object.fromEntries(Object.entries(cfg.ativos).filter(([, v]) => pesoNaCarteira(A, c, v) >= 1));
+    cfg.ativos = { ...Object.fromEntries(Object.keys(cfg.ativos).map(k => [k, 0])), ...arred(fica) };
+  } else if (acao === "sototal") delete cfg.ativos;
+  else if (acao === "atualTudo") alvoRascunho = alvoDaCarteira(P);
+  else if (acao === "descartar") { alvoRascunho = null; est.editando = false; }
+  else return;
+  salvarRascunho(); renderEditor(P); renderAlvo(P);
+}
+function initEditor() {
+  const el = document.getElementById("alvoEdit");
+  document.getElementById("btnEditar").addEventListener("click", () => {
+    const P = periodo();
+    if (!alvoRascunho) alvoRascunho = D.alvo ? JSON.parse(JSON.stringify(D.alvo)) : alvoDaCarteira(P);
+    est.editando = !est.editando;
+    salvarRascunho(); renderEditor(P); renderAlvo(P);
+  });
+  el.addEventListener("input", e => {
+    const inp = e.target, tr = inp.closest("tr"), A = alvoRascunho;
+    if (inp.dataset.regra) {
+      A.regras = { ...(A.regras || {}) };
+      if (+inp.value > 0) A.regras[inp.dataset.regra] = Math.min(100, +inp.value); else delete A.regras[inp.dataset.regra];
+      salvarRascunho(); renderAlvo(periodo()); renderDiag(periodo());
+      return;
+    }
+    if (!tr?.dataset.c || !["classe", "ativo"].includes(inp.dataset.campo)) return;
+    const v = Math.max(0, +inp.value || 0);
+    if (inp.dataset.campo === "classe") A.classes[tr.dataset.c] = { ...(A.classes[tr.dataset.c] || {}), alvo: v };
+    else A.classes[tr.dataset.c].ativos[tr.dataset.t] = v;
+    salvarRascunho(); atualizarDerivados(); renderAlvo(periodo());
+  });
+  el.addEventListener("change", e => {
+    if (e.target.dataset.campo !== "novaClasse" || !e.target.value) return;
+    const c = e.target.value;
+    alvoRascunho.classes[c] = SO_CLASSE.includes(c) ? { alvo: 0 } : { alvo: 0, ativos: {} };
+    salvarRascunho(); renderEditor(periodo()); renderAlvo(periodo());
+  });
+  el.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset.campo === "novo") acaoEditor("adicionar", e.target.closest("tr")); });
+  el.addEventListener("click", async e => {
+    const b = e.target.closest("[data-acao]");
+    if (!b) return;
+    if (b.dataset.acao === "exportar") return exportarAlvo();
+    if (b.dataset.acao === "copiar") {
+      try { await navigator.clipboard.writeText(JSON.stringify(alvoParaArquivo(), null, 2)); b.textContent = "Copiado ✓"; } catch (err) { b.textContent = "Não deu para copiar"; }
+      return;
+    }
+    acaoEditor(b.dataset.acao, b.closest("tr"));
+  });
+}
+
+// ---------------------------------------------------------------- regras da política (alvo.regras, em %)
+const REGRAS = {
+  max_ativo: ["Máx. por ativo", "Máximo de um ativo de renda variável na carteira"],
+  max_setor_classe: ["Máx. setor na classe", "Máximo de um setor dentro de Ações Brasil, Exterior ou FIIs"],
+  max_setor_carteira: ["Máx. setor na carteira", "Máximo de um setor na carteira toda, somando as classes"],
+  min_posicao: ["Mín. por posição", "Posição de renda variável abaixo disso: levar ao mínimo ou zerar"],
+  tolerancia_classe: ["Tolerância da classe (p.p.)", "Desvio aceito entre o % atual e o alvo de cada classe"],
+};
+// vender v de algo com S dentro de um total C para chegar a L: (S − v)/(C − v) = L; aportar a fora dele: S/(C + a) = L
+const vendaAte = (S, C, L) => (S - L * C) / (1 - L);
+const aporteAte = (S, C, L) => S / L - C;
+function checarRegras(P, alvo) {
+  const R = alvo?.regras || {}, lista = [], bloqueados = new Set(), T = P.fim.patrimonio;
+  const rv = P.fim.posicoes.filter(p => LISTADAS.includes(p.classe) && p.valor > 0);
+  const diversificado = n => n.startsWith("Índice amplo") || n === "Sem classificação";
+  const quebra = (titulo, S, C, L, tickers, onde) => {
+    tickers.forEach(t => bloqueados.add(t));
+    lista.push({ titulo, texto: `Para voltar ao limite: vender ${brl(vendaAte(S, C, L))} ou aportar ${brl(aporteAte(S, C, L))} ${onde}. Enquanto isso, ${tickers.length > 1 ? "eles não recebem" : "ele não recebe"} aporte nas sugestões abaixo.` });
+  };
+  if (R.max_ativo) agrupar(rv, p => p.ticker).filter(x => x.valor / T * 100 > R.max_ativo).forEach(x =>
+    quebra(`${x.nome} é ${pctAbs(x.valor / T * 100)} da carteira (limite ${pctAbs(R.max_ativo, 0)})`, x.valor, T, R.max_ativo / 100, [x.nome], "em outros ativos"));
+  if (R.max_setor_classe) ["Ações Brasil", EXTERIOR, "FIIs"].forEach(c => {
+    const ps = rv.filter(p => p.classe === c), C = soma(ps, p => p.valor);
+    if (!C) return;
+    agrupar(ps, p => c === "FIIs" ? setorDe(p.ticker) : grupoDe(setorDe(p.ticker))).filter(x => !diversificado(x.nome) && x.valor / C * 100 > R.max_setor_classe).forEach(x =>
+      quebra(`${c}: ${pctAbs(x.valor / C * 100, 0)} em ${x.nome.replace(/^FII /, "")} (limite ${pctAbs(R.max_setor_classe, 0)})`, x.valor, C, R.max_setor_classe / 100, x.tickers.map(([t]) => t), `em outros setores da classe`));
+  });
+  if (R.max_setor_carteira)
+    agrupar(rv, p => p.classe === "FIIs" ? setorDe(p.ticker) : grupoDe(setorDe(p.ticker))).filter(x => !diversificado(x.nome) && x.valor / T * 100 > R.max_setor_carteira).forEach(x =>
+      quebra(`${x.nome.replace(/^FII /, "FIIs de ")} soma ${pctAbs(x.valor / T * 100)} da carteira (limite ${pctAbs(R.max_setor_carteira, 0)})`, x.valor, T, R.max_setor_carteira / 100, x.tickers.map(([t]) => t), "fora desse setor"));
+  if (R.min_posicao) {
+    const peq = agrupar(rv, p => p.ticker).filter(x => x.valor / T * 100 < R.min_posicao).sort((a, b) => a.valor - b.valor);
+    const zerados = new Set(Object.values(alvo.classes || {}).flatMap(c => c.ativos ? Object.keys(c.ativos).filter(t => !c.ativos[t]) : []));
+    const decidir = peq.filter(x => !zerados.has(x.nome));
+    if (decidir.length) lista.push({
+      titulo: `${decidir.length} posição(ões) abaixo do mínimo de ${pctAbs(R.min_posicao, 0)}`,
+      texto: `${decidir.slice(0, 6).map(x => `${x.nome} (falta ${brl(R.min_posicao / 100 * T - x.valor)})`).join(", ")}${decidir.length > 6 ? "…" : ""}. Para cada uma: comprar até o mínimo ou zerar o alvo dela no editor (“Zerar < 1%”).`,
+    });
+  }
+  if (R.tolerancia_classe) {
+    const atual = posicaoAtual(P), cfg = alvo.classes || {}, tot = soma(Object.values(cfg), x => x.alvo || 0) || 100;
+    CLASSES.filter(c => cfg[c] || atual[c]).forEach(c => {
+      const a = (atual[c]?.valor || 0) / T * 100, al = (cfg[c]?.alvo || 0) / tot * 100, d = a - al;
+      if (Math.abs(d) <= R.tolerancia_classe) return;
+      const borda = (al + Math.sign(d) * R.tolerancia_classe) / 100, S = atual[c]?.valor || 0;
+      lista.push({
+        titulo: `${c}: ${pctAbs(a)} contra alvo de ${pctAbs(al)} (tolerância ±${pctAbs(R.tolerancia_classe, 0)} p.p.)`,
+        texto: d > 0 ? `Para voltar à faixa: vender ${brl(vendaAte(S, T, borda))} ou aportar ${brl(aporteAte(S, T, borda))} nas outras classes.`
+          : `Para voltar à faixa: aportar ${brl((borda * T - S) / (1 - borda))} nessa classe; o aporte do mês já vai primeiro para ela.`,
+      });
+    });
+  }
+  return { lista, bloqueados };
+}
+function regrasHtml(regras, alvo) {
+  const n = Object.keys(alvo?.regras || {}).length;
+  if (!n) return `<p class="hint">Sem regras definidas. Em <b>Editar alvo</b> você pode limitar o peso de um ativo ou de um setor, definir uma posição mínima e a tolerância de cada classe; o painel passa a apontar o que quebra cada limite.</p>`;
+  return `<h3 style="margin-top:4px">Regras da sua política</h3><ul class="alerts" style="margin-bottom:16px">` + (regras.lista.length
+    ? regras.lista.map(r => `<li class="serious"><span class="ic" aria-hidden="true">!</span><div><strong>${esc(r.titulo)}</strong><small>${esc(r.texto)}</small></div></li>`).join("")
+    : `<li class="good"><span class="ic" aria-hidden="true">✓</span><div><strong>As ${n} regras estão sendo respeitadas</strong></div></li>`) + `</ul>`;
+}
+
+// ---------------------------------------------------------------- carteira ideal: sugestões
+// quanto comprar (+) ou vender (−) de cada item para chegar perto do peso-alvo; sem vender, o dinheiro vai só para quem está abaixo
+function distribuir(itens, dinheiro, vender) {
+  const pesoTot = soma(itens, i => i.peso);
+  const T = soma(itens, i => i.atual) + dinheiro;
+  const alvo = itens.map(i => pesoTot > 0 ? T * i.peso / pesoTot : 0);
+  if (vender) return itens.map((i, j) => alvo[j] - i.atual);
+  if (dinheiro <= 0) return itens.map(() => 0);
+  const falta = itens.map((i, j) => Math.max(0, alvo[j] - i.atual));
+  const F = soma(falta);
+  if (F >= dinheiro) return falta.map(f => dinheiro * f / F);
+  return falta.map((f, j) => f + (dinheiro - F) * (pesoTot > 0 ? itens[j].peso / pesoTot : 1 / itens.length));
+}
+
+function renderAlvo(P) {
+  const body = document.getElementById("alvoBody"), hint = document.getElementById("alvoHint");
+  const ALVO = alvoEfetivo();
+  document.getElementById("alvoCtl").hidden = !ALVO;
+  if (!ALVO) {
+    hint.textContent = "";
+    body.innerHTML = `<p class="lead">Defina a carteira ideal para ver o que comprar a cada mês: clique em <b>Editar alvo</b>, que começa pela composição atual.</p>`;
+    return;
+  }
+  const aporte = est.aporte ?? (ALVO.aporte_mensal || 0), vender = est.rebal === "completo";
+  const total = P.fim.patrimonio;
+  const atual = posicaoAtual(P);
+  const cfg = ALVO.classes || {};
+  const regras = checarRegras(P, ALVO);
+  const somaAlvo = soma(CLASSES, c => cfg[c]?.alvo || 0) || 100;
+  const linhas = CLASSES.filter(c => cfg[c] || atual[c]).map(c => ({ c, atual: atual[c]?.valor || 0, peso: cfg[c]?.alvo || 0 }));
+  distribuir(linhas, aporte, vender).forEach((m, i) => Object.assign(linhas[i], { mov: m, pAtual: linhas[i].atual / total * 100, pAlvo: linhas[i].peso / somaAlvo * 100 }));
+
+  const ativos = [];
+  linhas.forEach(l => {
+    const lista = cfg[l.c]?.ativos;
+    if (!lista) return void ativos.push({ ativo: `${l.c} (${l.mov < 0 ? "resgatar ou vender" : "você escolhe o ativo"})`, classe: l.c, atual: l.atual, pAlvo: l.pAlvo, mov: l.mov, generico: true });
+    const doCls = atual[l.c]?.ativos || {};
+    const ks = [...new Set([...Object.keys(doCls), ...Object.keys(lista)])];
+    const somaA = soma(ks, k => lista[k] || 0) || 100;
+    const itens = ks.map(k => ({ k, atual: doCls[k]?.valor || 0, peso: lista[k] || 0, preco: doCls[k]?.preco }));
+    // só com aportes, o que já passou de uma regra não recebe dinheiro (a menos que a classe inteira esteja bloqueada)
+    const livres = itens.map(i => regras.bloqueados.has(i.k) ? { ...i, peso: 0 } : i);
+    const dist = vender || !soma(livres, i => i.peso) ? itens : livres;
+    distribuir(dist, l.mov, vender).forEach((m, j) => ativos.push({ ativo: itens[j].k, classe: l.c, atual: itens[j].atual, pAlvo: l.pAlvo * itens[j].peso / somaA, mov: m, preco: itens[j].preco, fora: !lista[itens[j].k] }));
+  });
+  ativos.forEach(a => a.pAtual = a.atual / total * 100);
+
+  const desvio = soma(linhas, l => Math.abs(l.pAtual - l.pAlvo)) / 2;
+  const fora = [...linhas].sort((a, b) => Math.abs(b.pAtual - b.pAlvo) - Math.abs(a.pAtual - a.pAlvo)).filter(l => Math.abs(l.pAtual - l.pAlvo) >= 1).slice(0, 3);
+  const semAlvo = ativos.filter(a => a.fora && a.atual > 0);
+  hint.innerHTML = (rascunhoPendente() ? `<span class="pill">rascunho deste navegador, ainda não salvo em dados/alvo.json</span> ` : "Alvo em dados/alvo.json, ") + `sobre a posição de ${mesLongo(P.fim.mes)}. ` + (vender ? "Compra o que falta e vende o que passou do alvo." : "Distribui o aporte entre o que está abaixo do alvo, sem vender nada.");
+  const acoes = ativos.filter(a => Math.abs(a.mov) >= 1).sort((a, b) => b.mov - a.mov);
+  const cotas = a => a.preco && !a.generico && Math.abs(a.mov) >= a.preco ? `≈ ${Math.trunc(Math.abs(a.mov) / a.preco).toLocaleString("pt-BR")}` : "—";
+  const dif = (a, b) => `<td class="n">${pp(a - b)}</td>`;
+  body.innerHTML =
+    `<p class="lead" style="margin-top:12px">A carteira está a <b>${pctAbs(desvio)}</b> do alvo${fora.length ? `; as classes mais longe são ${fora.map(l => `<b>${esc(l.c)}</b> (${pctAbs(l.pAtual)} contra ${pctAbs(l.pAlvo)})`).join(", ")}` : ""}.` +
+    (semAlvo.length ? ` ${semAlvo.length} ativo(s) (${brl(soma(semAlvo, a => a.atual))}) não estão na carteira ideal: ${vender ? "aparecem como venda" : "não recebem aporte; use “Vendendo o excesso” para ver a venda"}.` : "") + `</p>` +
+    regrasHtml(regras, ALVO) +
+    (!rascunhoPendente() && D.alvo_avisos?.length ? `<p class="hint">${D.alvo_avisos.map(esc).join(" · ")}</p>` : "") +
+    `<div class="grid g-2" style="margin:0">
+      <div><h3>Por tipo de ativo</h3><div class="tbl-wrap"><table>
+        <thead><tr><th>Tipo</th><th class="n">Atual</th><th class="n">Alvo</th><th class="n">Desvio</th><th class="n">${vender ? "Comprar / vender" : "Aportar"}</th></tr></thead><tbody>` +
+        linhas.map(l => `<tr><td><span class="dot" style="background:${corClasse(l.c)}"></span>${esc(l.c)}</td><td class="n">${pctAbs(l.pAtual)}</td><td class="n">${pctAbs(l.pAlvo)}</td>${dif(l.pAtual, l.pAlvo)}<td class="n ${cls(l.mov)}">${Math.abs(l.mov) >= 1 ? brlS(l.mov) : "—"}</td></tr>`).join("") +
+        `<tr class="total"><td>Total</td><td class="n">100%</td><td class="n">100%</td><td></td><td class="n">${brlS(aporte)}</td></tr></tbody></table></div></div>
+      <div><h3>O que fazer no próximo mês</h3><div class="tbl-wrap" style="max-height:420px"><table>
+        <thead><tr><th>Ativo</th><th>Tipo</th><th class="n">Valor</th><th class="n">Cotas</th></tr></thead><tbody>` +
+        (acoes.length ? acoes.map(a => `<tr><td class="wrap"><strong>${esc(a.ativo)}</strong>${a.fora ? ` <span class="pill">fora do alvo</span>` : ""}${!a.atual && !a.generico ? ` <span class="pill">novo</span>` : ""}</td><td><span class="dot" style="background:${corClasse(a.classe)}"></span>${esc(a.classe)}</td><td class="n ${cls(a.mov)}">${brlS(a.mov)}</td><td class="n">${cotas(a)}</td></tr>`).join("")
+          : `<tr><td colspan="4">Nada a fazer: ${aporte > 0 || vender ? "a carteira já está no alvo" : "informe o aporte do mês"}.</td></tr>`) +
+        `</tbody></table></div><p class="hint" style="margin-top:6px">Cotas pelo preço de fechamento de ${mesLongo(P.fim.mes)}; confira o preço do dia antes de comprar.</p></div>
+    </div>
+    <details><summary>Todos os ativos contra o alvo (${ativos.filter(a => !a.generico).length})</summary><div class="tbl-wrap" style="max-height:480px"><table>
+      <thead><tr><th>Ativo</th><th>Tipo</th><th class="n">Valor</th><th class="n">% atual</th><th class="n">% alvo</th><th class="n">Desvio</th><th class="n">Sugestão</th></tr></thead><tbody>` +
+      ativos.filter(a => !a.generico).sort((a, b) => (a.pAtual - a.pAlvo) - (b.pAtual - b.pAlvo)).map(a => `<tr><td><strong>${esc(a.ativo)}</strong>${a.fora ? ` <span class="pill">fora do alvo</span>` : ""}</td><td><span class="dot" style="background:${corClasse(a.classe)}"></span>${esc(a.classe)}</td><td class="n">${brl(a.atual)}</td><td class="n">${pctAbs(a.pAtual, 2)}</td><td class="n">${pctAbs(a.pAlvo, 2)}</td>${dif(a.pAtual, a.pAlvo)}<td class="n ${cls(a.mov)}">${Math.abs(a.mov) >= 1 ? brlS(a.mov) : "—"}</td></tr>`).join("") +
+      `</tbody></table></div></details>`;
+}
+function initAlvo() {
+  const inp = document.getElementById("aporte");
+  inp.value = alvoEfetivo()?.aporte_mensal || 0;
+  initEditor();
+  inp.addEventListener("input", () => { est.aporte = Math.max(0, +inp.value || 0); renderAlvo(periodo()); });
+  document.querySelectorAll("[data-rebal]").forEach(b => b.addEventListener("click", () => {
+    est.rebal = b.dataset.rebal; document.querySelectorAll("[data-rebal]").forEach(x => x.setAttribute("aria-pressed", x === b)); renderAlvo(periodo());
+  }));
+}
+
+// ---------------------------------------------------------------- simulador
+// mistura dos índices de cada classe sobre o histórico longo de mercado.py, rebalanceada todo mês
+const HIST = D.historico || {};
+const SERIE_SIM = { "Ações Brasil": "Ibovespa", [EXTERIOR]: "S&P 500 (R$)", "FIIs": "IFIX", "Cripto": "Bitcoin (R$)", "Renda fixa (CDB/LCA)": "CDI", "Tesouro Direto": "CDI", "Crédito privado": "CDI" };
+const RF_SIM = ["Renda fixa (CDB/LCA)", "Tesouro Direto", "Crédito privado"];
+// janelas como nos filtros da carteira, mais as longas; "a:AAAA" = um ano específico
+const JANELAS = [["mes", "Último mês"], ["ano", "No ano"], ["12m", "12 meses"], ["60", "5 anos"], ["120", "10 anos"], ["180", "15 anos"], ["max", "Máximo"]];
+function recorte(todos, j) {
+  const ano = (todos[todos.length - 1] || "").slice(0, 4);
+  if (j === "mes") return todos.slice(-1);
+  if (j === "12m") return todos.slice(-12);
+  if (j === "ano") return todos.filter(m => m.startsWith(ano));
+  if (j.startsWith("a:")) return todos.filter(m => m.startsWith(j.slice(2)));
+  return j === "max" ? todos : todos.slice(-j);
+}
+const cabe = (todos, j) => j.startsWith("a:") ? todos.some(m => m.startsWith(j.slice(2))) : !/^\d+$/.test(j) || +j <= todos.length;
+const simulavel = c => !!HIST[SERIE_SIM[c]];
+const mesAnt = m => { const [a, n] = m.split("-").map(Number); return n === 1 ? `${a - 1}-12` : `${a}-${String(n - 1).padStart(2, "0")}`; };
+// classes com menos de 1% num mix não entram no cálculo: uma posição irrelevante de série curta (cripto desde 2014) encurtaria a janela de todos
+const relevantes = pesos => pesos && Object.fromEntries(Object.entries(pesos).filter(([, v]) => v >= 1));
+const normalizar = pesos => { const t = soma(Object.values(pesos)); return t > 0 ? Object.fromEntries(Object.entries(pesos).filter(([, v]) => v > 0).map(([c, v]) => [c, v / t])) : {}; };
+const media = a => soma(a) / a.length;
+const desvio = a => { const mu = media(a); return Math.sqrt(soma(a, x => (x - mu) ** 2) / (a.length - 1)); };
+let simCharts = [];
+
+// meses em que todas as séries usadas (mais CDI e IPCA) existem; n = últimos n meses (0 = tudo)
+function mesesComuns(classes, n) {
+  const series = [...new Set([...classes.map(c => SERIE_SIM[c]), "CDI", "IPCA"])];
+  const ms = Object.keys(HIST.CDI || {}).sort().filter(m => series.every(s => HIST[s] && m in HIST[s]));
+  return n ? ms.slice(-n) : ms;
+}
+const serieDe = (c, meses) => meses.map(m => HIST[SERIE_SIM[c]][m] / 100);
+function metricas(pesos, meses) {
+  const w = normalizar(pesos), n = meses.length;
+  if (!n || !Object.keys(w).length) return null;
+  const rs = meses.map(m => soma(Object.entries(w), ([c, x]) => x * HIST[SERIE_SIM[c]][m] / 100));
+  const acum = []; let f = 1;
+  rs.forEach(r => acum.push(f *= 1 + r));
+  // menos de 12 meses: retorno do período, sem anualizar; volatilidade e Sharpe só a partir de 3 meses
+  const curto = n < 12, fIpca = meses.reduce((g, m) => g * (1 + HIST.IPCA[m] / 100), 1);
+  const anual = curto ? f - 1 : Math.pow(f, 12 / n) - 1;
+  const ipca = curto ? fIpca - 1 : Math.pow(fIpca, 12 / n) - 1;
+  const exc = rs.map((r, i) => r - HIST.CDI[meses[i]] / 100);
+  // pior queda: maior distância de um pico; recuperação contada a partir do fundo
+  let pico = 1, dd = 0, iFundo = -1, picoDoFundo = 1;
+  acum.forEach((v, i) => { pico = Math.max(pico, v); if (v / pico - 1 < dd) { dd = v / pico - 1; iFundo = i; picoDoFundo = pico; } });
+  const j = iFundo < 0 ? -1 : acum.findIndex((v, i) => i > iFundo && v >= picoDoFundo);
+  return {
+    anual: anual * 100, real: ((1 + anual) / (1 + ipca) - 1) * 100, vol: n >= 3 ? desvio(rs) * Math.sqrt(12) * 100 : null, dd: dd * 100,
+    rec: iFundo < 0 ? 0 : j < 0 ? null : j - iFundo, neg: rs.filter(r => r < 0).length / n * 100,
+    sharpe: n >= 3 && desvio(exc) > 0 ? media(exc) * 12 / (desvio(exc) * Math.sqrt(12)) : null, final: f * 100, acum,
+  };
+}
+// contribuição de cada classe para a variância do mix: w_i·(Σw)_i / σ²
+function contribRisco(pesos, meses) {
+  const w = normalizar(pesos), cs = Object.keys(w);
+  const X = cs.map(c => serieDe(c, meses)), mu = X.map(media);
+  const cov = (i, j) => { let s = 0; for (let t = 0; t < meses.length; t++) s += (X[i][t] - mu[i]) * (X[j][t] - mu[j]); return s / (meses.length - 1); };
+  const Sw = cs.map((_, i) => soma(cs.map((c, j) => cov(i, j) * w[c])));
+  const vari = soma(cs.map((c, i) => w[c] * Sw[i]));
+  return cs.map((c, i) => ({ c, peso: w[c] * 100, risco: vari > 0 ? w[c] * Sw[i] / vari * 100 : 0 }));
+}
+
+function pesosAtuais(P) {
+  const a = posicaoAtual(P);
+  return Object.fromEntries(CLASSES.filter(c => a[c] && simulavel(c)).map(c => [c, a[c].valor / P.fim.patrimonio * 100]));
+}
+function pesosAlvo() {
+  const A = alvoEfetivo();
+  return A ? Object.fromEntries(Object.entries(A.classes).filter(([c, x]) => simulavel(c) && x.alvo > 0).map(([c, x]) => [c, x.alvo])) : null;
+}
+// referências calculadas sobre as classes que você já tem
+function referencias(P, meses) {
+  // cripto fica de fora: dar a ela o mesmo peso das outras premia quem olhou o Bitcoin depois de ele subir
+  const atual = relevantes(pesosAtuais(P)), cs = Object.keys(atual).filter(c => c !== "Cripto");
+  const rf = cs.filter(c => RF_SIM.includes(c)), rv = cs.filter(c => !RF_SIM.includes(c));
+  const parte = (lista, total) => { const t = soma(lista, c => atual[c]); return Object.fromEntries(lista.map(c => [c, total * atual[c] / t])); };
+  const inv = Object.fromEntries(rv.map(c => [c, 1 / (desvio(serieDe(c, meses)) || 1)]));
+  const rfAtual = soma(rf, c => atual[c]);
+  return {
+    iguais: Object.fromEntries(cs.map(c => [c, 100 / cs.length])),
+    "6040": rf.length && rv.length ? { ...parte(rf, 60), ...parte(rv, 40) } : null,
+    // paridade de risco só entre as classes de renda variável: com o CDI junto, ele levaria quase tudo
+    paridade: rv.length ? { ...parte(rf, rfAtual), ...Object.fromEntries(rv.map(c => [c, (100 - rfAtual) * inv[c] / soma(rv, k => inv[k])])) } : null,
+  };
+}
+
+function renderSim(P) {
+  const body = document.getElementById("simBody");
+  est.sim ??= { pesos: null, janela: "120" };
+  simCharts = simCharts.filter(c => charts.includes(c));  // render() já destruiu os gráficos da rodada anterior
+  if (!HIST.CDI || !HIST.IPCA) {
+    document.getElementById("simHint").textContent = "";
+    document.getElementById("simJanela").innerHTML = "";
+    body.innerHTML = `<p class="lead">Sem histórico de mercado (offline ou fonte fora do ar): rode <code>scripts/gerar.py</code> com internet para usar o simulador.</p>`;
+    return;
+  }
+  est.sim.pesos ??= arred(pesosAtuais(P));
+  const classes = CLASSES.filter(simulavel);
+  body.innerHTML = `<div class="row" style="margin-top:12px">
+      <div class="seg">${[["atual", "Atual"], ["alvo", "Alvo"], ["iguais", "Pesos iguais"], ["6040", "60/40"], ["paridade", "Paridade de risco"]].map(([k, l]) => `<button type="button" data-simp="${k}">${l}</button>`).join("")}</div>
+      <span class="spacer"></span><button type="button" id="simAplicar">Aplicar ao alvo</button></div>
+    <div class="sim-pesos">${classes.map(c => `<label class="campo"><span class="dot" style="background:${corClasse(c)}"></span>${esc(c)} <input type="number" min="0" max="100" step="1" data-simc="${esc(c)}" value="${+(est.sim.pesos[c] || 0).toFixed(1)}" aria-label="% de ${esc(c)} no mix simulado"></label>`).join("")}<span class="campo" id="simSoma"></span></div>
+    <div class="tbl-wrap"><table id="tSim"></table></div>
+    <div class="grid g-2" style="margin:16px 0 0">
+      <div><h3>Crescimento de R$ 100</h3><div class="legend" id="lgSim"></div><div class="chart" style="height:280px"><canvas id="cSim"></canvas></div></div>
+      <div><h3>Contribuição para o risco do mix simulado</h3><p class="hint">Quanto da oscilação vem de cada classe, contra o peso dela. Classe que pesa pouco e oscila muito aparece aqui.</p><div class="chart" id="simRiscoWrap"><canvas id="cSimRisco"></canvas></div></div>
+    </div>`;
+  body.querySelectorAll("[data-simc]").forEach(inp => inp.addEventListener("input", () => {
+    est.sim.pesos[inp.dataset.simc] = Math.max(0, +inp.value || 0); atualizarSim(periodo());
+  }));
+  body.querySelectorAll("[data-simp]").forEach(b => b.addEventListener("click", () => {
+    const P2 = periodo(), meses = mesesComuns(CLASSES.filter(simulavel), 0);
+    const ref = referencias(P2, meses);
+    const p = { atual: pesosAtuais(P2), alvo: pesosAlvo(), ...ref }[b.dataset.simp];
+    if (!p) return;
+    est.sim.pesos = arred(p); renderSim(P2);
+  }));
+  document.getElementById("simAplicar").addEventListener("click", aplicarSimAoAlvo);
+  atualizarSim(P);
+}
+
+function atualizarSim(P) {
+  const pesosSim = est.sim.pesos;
+  const sc = soma(Object.values(pesosSim));
+  document.getElementById("simSoma").innerHTML = `Soma: <b class="${Math.abs(sc - 100) <= 0.05 ? "up" : "down"}">${pctAbs(sc)}</b>${Math.abs(sc - 100) > 0.05 ? " (normalizada para 100%)" : ""}`;
+  const alvo = pesosAlvo();
+  // janela comum a todas as classes usadas em qualquer coluna, para comparar no mesmo período
+  const usadas = CLASSES.filter(c => simulavel(c) && [pesosSim, pesosAtuais(P), alvo || {}].some(p => (p[c] || 0) >= 1));
+  const maximo = mesesComuns(usadas, 0);
+  if (!cabe(maximo, est.sim.janela)) est.sim.janela = "max";
+  const meses = recorte(maximo, est.sim.janela);
+  const anos = [...new Set(maximo.map(m => m.slice(0, 4)))].reverse();
+  const jEl = document.getElementById("simJanela");
+  jEl.innerHTML = JANELAS.map(([k, l]) => `<button type="button" data-simj="${k}" aria-pressed="${k === est.sim.janela}" ${cabe(maximo, k) ? "" : "disabled"}>${l}</button>`).join("") +
+    `<select data-simano aria-label="Ano da simulação"><option value="">Ano…</option>${anos.map(a => `<option value="a:${a}" ${est.sim.janela === `a:${a}` ? "selected" : ""}>${a}</option>`).join("")}</select>`;
+  jEl.querySelectorAll("[data-simj]").forEach(b => b.addEventListener("click", () => { est.sim.janela = b.dataset.simj; atualizarSim(periodo()); }));
+  jEl.querySelector("[data-simano]").addEventListener("change", e => { if (e.target.value) { est.sim.janela = e.target.value; atualizarSim(periodo()); } });
+  const limita = usadas.map(c => SERIE_SIM[c]).sort((a, b) => Object.keys(HIST[b]).sort()[0].localeCompare(Object.keys(HIST[a]).sort()[0]))[0];
+  document.getElementById("simHint").innerHTML = `Índices de cada classe (Ibovespa, S&P 500 com dividendos em R$, IFIX, CDI${usadas.includes("Cripto") ? ", Bitcoin em R$" : ""}), não os seus ativos; rebalanceamento mensal, sem custos nem IR. Renda fixa e Tesouro entram como CDI: Tesouro IPCA+ a mercado oscila bem mais. Classes com menos de 1% ficam de fora do cálculo.` +
+    (usadas.includes("Cripto") ? ` Cripto usa o Bitcoin em R$ como aproximação: ETFs de cripto costumam seguir cestas (o Nasdaq Crypto Index tem cerca de 75% de Bitcoin), e o histórico do Bitcoin é o de quem já sabe que ele subiu.` : "") +
+    ` Passado não garante futuro e isto não é recomendação.` +
+    (meses.length ? ` <b>Janela: ${mesLongo(meses[0])} a ${mesLongo(meses[meses.length - 1])} (${meses.length} ${meses.length > 1 ? "meses" : "mês"})</b>${est.sim.janela === "max" && limita ? `, limitada por ${esc(limita)} (desde ${mesLongo(Object.keys(HIST[limita]).sort()[0])})` : ""}.` : "");
+
+  const ref = referencias(P, maximo);  // volatilidade da paridade de risco pela janela toda: estável mesmo num recorte curto
+  const mixes = [["Simulado", relevantes(pesosSim), "--ink"], ["Atual", relevantes(pesosAtuais(P)), "--s1"], ["Alvo", relevantes(alvo), "--s3"], ["Pesos iguais", ref.iguais, "--s4"], ["60/40", ref["6040"], "--s5"], ["Paridade de risco", ref.paridade, "--s7"]]
+    .filter(([, p]) => p && Object.keys(normalizar(p)).length).map(([n, p, cor]) => ({ n, w: normalizar(p), m: metricas(p, meses), cor: css(cor) }));
+  const cdiM = metricas({ "Renda fixa (CDB/LCA)": 1 }, meses);
+  const linhaCls = CLASSES.filter(c => mixes.some(x => x.w[c]));
+  const linhas = [
+    ...linhaCls.map(c => [`<span class="dot" style="background:${corClasse(c)}"></span>${esc(c)}`, x => pctAbs((x.w[c] || 0) * 100, 0)]),
+    [meses.length < 12 ? "<b>Retorno no período</b>" : "<b>Retorno ao ano</b>", x => pct(x.m.anual)], ["Retorno real (acima do IPCA)", x => pct(x.m.real)], ["Volatilidade ao ano", x => x.m.vol == null ? "—" : pctAbs(x.m.vol)],
+    ["Pior queda", x => pct(x.m.dd)], ["Meses do fundo até recuperar", x => x.m.rec == null ? "não recuperou" : x.m.rec],
+    ["Meses negativos", x => pctAbs(x.m.neg, 0)], ["Sharpe (sobre o CDI)", x => x.m.sharpe == null ? "—" : x.m.sharpe.toLocaleString("pt-BR", { maximumFractionDigits: 2 })],
+    ["R$ 100 viraram", x => brl(x.m.final)],
+  ];
+  document.getElementById("tSim").innerHTML = `<thead><tr><th></th>${mixes.map(x => `<th class="n">${esc(x.n)}</th>`).join("")}</tr></thead><tbody>` +
+    linhas.map(([r, f], i) => `<tr${i === linhaCls.length ? ' class="total"' : ""}><td>${r}</td>${mixes.map(x => `<td class="n">${x.m ? f(x) : "—"}</td>`).join("")}</tr>`).join("") + "</tbody>";
+
+  simCharts.forEach(c => c.destroy());
+  charts = charts.filter(c => !simCharts.includes(c));
+  simCharts = [];
+  if (!meses.length) return;
+  const series = [...mixes.map(x => [x.n, x.m.acum, x.cor]), ["CDI", cdiM.acum, css("--s6")]];
+  legend("lgSim", series.map(([n, , c]) => [n, c]));
+  simCharts.push(new Chart(document.getElementById("cSim"), {
+    type: "line",
+    data: { labels: [mesAnt(meses[0]), ...meses].map(mesLabel), datasets: series.map(([label, acum, c]) => ({ label, data: [100, ...acum.map(v => v * 100)], borderColor: c, backgroundColor: c, borderWidth: label === "Simulado" ? 3 : 1.5, borderDash: label === "CDI" ? [5, 4] : [], pointRadius: 0, pointHoverRadius: 4, tension: 0.1 })) },
+    options: {
+      ...base(), interaction: { mode: "index", intersect: false },
+      scales: { x: { ...eixoX(), ticks: { color: css("--ink-2"), maxTicksLimit: 10 } }, y: eixoY(v => `R$ ${v}`) },
+      plugins: { legend: { display: false }, tooltip: tip({ callbacks: { label: c => ` ${c.dataset.label}: ${brl2(c.raw)}` } }) },
+    },
+  }));
+  const rc = contribRisco(relevantes(pesosSim), meses);
+  document.getElementById("simRiscoWrap").style.height = `${rc.length * 40 + 40}px`;
+  simCharts.push(new Chart(document.getElementById("cSimRisco"), {
+    type: "bar",
+    data: { labels: rc.map(x => x.c), datasets: [
+      { label: "Peso", data: rc.map(x => x.peso), backgroundColor: css("--axis"), borderRadius: 3, barPercentage: 0.8 },
+      { label: "Risco", data: rc.map(x => x.risco), backgroundColor: rc.map(x => corClasse(x.c)), borderRadius: 3, barPercentage: 0.8 },
+    ] },
+    options: {
+      ...base(), indexAxis: "y",
+      scales: { x: { ...eixoY(v => `${v}%`), beginAtZero: true }, y: { grid: { display: false }, border: { display: false }, ticks: { color: css("--ink-2"), font: { size: 11 } } } },
+      plugins: { legend: { display: false }, tooltip: tip({ callbacks: { label: c => ` ${c.dataset.label === "Peso" ? "Peso no mix" : "Parte do risco"}: ${pctAbs(c.raw)}` } }) },
+    },
+  }));
+  charts.push(...simCharts);
+}
+
+function aplicarSimAoAlvo() {
+  const P = periodo();
+  if (!alvoRascunho) alvoRascunho = D.alvo ? JSON.parse(JSON.stringify(D.alvo)) : alvoDaCarteira(P);
+  const novos = arred(normalizar(est.sim.pesos));
+  // classes simuláveis fora do mix vão a 0; as demais (sem série) ficam como estão; os ativos de cada classe são mantidos
+  Object.keys(alvoRascunho.classes).forEach(c => { if (simulavel(c) && !(c in novos)) alvoRascunho.classes[c].alvo = 0; });
+  Object.entries(novos).forEach(([c, v]) => alvoRascunho.classes[c] = { ...(alvoRascunho.classes[c] || (SO_CLASSE.includes(c) ? {} : { ativos: {} })), alvo: v });
+  est.editando = true;
+  salvarRascunho();
+  history.pushState(null, "", location.pathname + location.search);
+  render();
+  document.getElementById("alvoEdit").scrollIntoView({ block: "start" });
+}
+function initSim() {
+  est.sim ??= { pesos: null, janela: "120" };
+}
+
+// ---------------------------------------------------------------- ganho por classe
 function renderGanho(P) {
   const presentes = CLASSES.filter(c => P.meses.some(m => m.classes[c] && Math.abs(m.classes[c].ganho) > 0.5));
   legend("lgGanho", presentes.map(c => [c, corClasse(c)]));
@@ -556,9 +1316,7 @@ function renderTree(P) {
 
 // ---------------------------------------------------------------- contribuições
 function renderContrib(P) {
-  const g = {};
-  P.meses.forEach(m => Object.entries(m.ganho_ativo || {}).forEach(([id, v]) => g[id] = (g[id] || 0) + v));
-  const todos = Object.entries(g).map(([id, v]) => ({ id, v, ...nomeDe(id) })).sort((a, b) => b.v - a.v);
+  const todos = ganhoPorAtivo(P).sort((a, b) => b.v - a.v);
   const top = todos.slice(0, 8), bot = todos.slice(-8).filter(x => x.v < 0 && !top.includes(x));
   const rows = [...top.filter(x => x.v > 0), ...bot];
   document.getElementById("contribWrap").style.height = `${rows.length * 24 + 30}px`;
@@ -716,12 +1474,20 @@ function initPos() {
 }
 
 // ---------------------------------------------------------------- boot
+const abaAtual = () => location.hash === "#simulador" ? "simulador" : "carteira";
+function syncAba() {
+  const a = abaAtual();
+  document.getElementById("abaCarteira").hidden = a !== "carteira";
+  document.getElementById("abaSimulador").hidden = a !== "simulador";
+  document.querySelectorAll("[data-aba]").forEach(b => { b.setAttribute("aria-selected", b.dataset.aba === a); b.setAttribute("aria-pressed", b.dataset.aba === a); });
+}
 function render() {
+  syncAba();
   const P = periodo();
   syncControles();
   charts.forEach(c => c.destroy()); charts = [];
-  renderTiles(P); renderEvo(P); renderMes(P); renderAcum(P); renderClasse(P); renderGanho(P);
-  renderTree(P); renderContrib(P); renderProv(P); renderMeses(P); renderMov(P); renderAlerts(P); renderPos(P);
+  renderTiles(P); renderEvo(P); renderMes(P); renderAcum(P); renderDiag(P); renderGanho(P);
+  renderContrib(P); renderTree(P); renderSetor(P); renderEditor(P); renderAlvo(P); renderSim(P); renderProv(P); renderMeses(P); renderMov(P); renderAlerts(P); renderPos(P);
 }
 function init() {
   const temaUrl = new URLSearchParams(location.search).get("tema");  // ?tema=light|dark (screenshots)
@@ -738,8 +1504,11 @@ function init() {
     "A B3 não informa aplicações e resgates de CDB/LCA/Tesouro: são deduzidos pela diferença entre os meses. Compras de fim de mês entram quando liquidam.",
     "Benchmarks: CDI, IPCA e PTAX (Banco Central); Ibovespa, S&P 500 e IFIX via ETF XFIX11 (Yahoo Finance). Caixinhas/RDB do Nubank não aparecem na B3.",
     "A B3 entrega a posição por fim de mês; por isso o menor período selecionável é um mês.",
+    "ETFs entram na classe do que carregam: Ibovespa e dividendos em Ações Brasil, S&P/global em Exterior (com os BDRs), títulos públicos em Tesouro Direto, cripto em Cripto.",
   ].map(t => `<li>${t}</li>`).join("");
-  initPeriodo(); initPos();
+  initPeriodo(); initPos(); initAlvo(); initSim();
+  document.querySelectorAll("[data-aba]").forEach(b => b.addEventListener("click", () => { location.hash = b.dataset.aba === "simulador" ? "simulador" : ""; }));
+  addEventListener("hashchange", () => { render(); scrollTo(0, 0); });
   document.querySelectorAll("[data-evo]").forEach(b => b.addEventListener("click", () => {
     est.evo = b.dataset.evo; document.querySelectorAll("[data-evo]").forEach(x => x.setAttribute("aria-pressed", x === b)); render();
   }));

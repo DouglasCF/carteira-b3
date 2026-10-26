@@ -8,6 +8,7 @@ Nada aqui toca em dados/ ou relatorios/data.js: tudo vai para a pasta de destino
 (CARTEIRA_HOME). Os números são inventados; os tickers são só nomes conhecidos.
 """
 import argparse
+import json
 import os
 import random
 import subprocess
@@ -42,6 +43,19 @@ NEGOCIACOES = [
     ("2026-03", "2026-03-31", "AAPL34", 50, 0, "2026-04"),  # fim de mês: liquida no mês seguinte
     ("2026-05", "2026-05-20", "PETR4", 0, 150, "2026-05"),
 ]
+
+# carteira ideal fictícia (dados/alvo.json): XPML11 ainda não está na carteira, então vira compra
+ALVO = {
+    "aporte_mensal": 5000,
+    "regras": {"max_ativo": 10, "max_setor_classe": 40, "max_setor_carteira": 15, "min_posicao": 1, "tolerancia_classe": 5},
+    "classes": {
+        "Ações Brasil": {"alvo": 35, "ativos": {"PETR4": 15, "VALE3": 20, "ITUB4": 25, "WEGE3": 20, "BOVA11": 20}},
+        "Exterior (BDRs e ETFs)": {"alvo": 25, "ativos": {"AAPL34": 30, "MSFT34": 30, "IVVB11": 40}},
+        "FIIs": {"alvo": 15, "ativos": {"HGLG11": 50, "KNRI11": 30, "XPML11": 20}},
+        "Renda fixa (CDB/LCA)": {"alvo": 15},
+        "Tesouro Direto": {"alvo": 10},
+    },
+}
 
 
 def ultimo_dia_util(ano, mes):
@@ -156,6 +170,7 @@ def main():
         env["CARTEIRA_SEM_MERCADO"] = "1"
     py = [sys.executable, "-W", "ignore"]
     subprocess.run(py + [str(SCRIPTS / "importar.py"), "--origem", str(home / "downloads")], env=env, check=True, stdout=subprocess.DEVNULL)
+    (home / "dados" / "alvo.json").write_text(json.dumps(ALVO, ensure_ascii=False, indent=2))
     subprocess.run(py + [str(SCRIPTS / "gerar.py")], env=env, check=True)
 
     painel = home / "relatorios" / "dashboard.html"

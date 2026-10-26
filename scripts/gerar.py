@@ -19,22 +19,62 @@ from collections import defaultdict
 from datetime import date
 
 import mercado
-from config import DIR_MENSAL, SAIDA
+import setores
+from config import ALVO, DIR_MENSAL, SAIDA
 
+EXTERIOR = "Exterior (BDRs e ETFs)"
 BENCH_CLASSE = {
     "Ações Brasil": "Ibovespa",
-    "BDRs (ações globais)": "S&P 500 (R$)",
-    "ETFs": "Ibovespa",
+    EXTERIOR: "S&P 500 (R$)",
     "FIIs": "IFIX",
+    "Cripto": None,  # sem índice: o resultado da classe conta todo como alocação
     "Renda fixa (CDB/LCA)": "CDI",
     "Tesouro Direto": "CDI",
     "Crédito privado": "CDI",
 }
 EPS = 1e-6
+# limites que o usuário define em dados/alvo.json ("regras"), todos em %; o dashboard aponta o que os quebra
+REGRAS = {
+    "max_ativo": "de um ativo de renda variável na carteira",
+    "max_setor_classe": "de um setor dentro de Ações Brasil, Exterior ou FIIs",
+    "max_setor_carteira": "de um setor na carteira toda, somando as classes",
+    "min_posicao": "mínimo de uma posição de renda variável (abaixo disso: levar ao mínimo ou zerar)",
+    "tolerancia_classe": "desvio aceito entre o % atual e o alvo de cada classe, em p.p.",
+}
+
+
+def classe_economica(p, mapa):
+    """A B3 separa por produto (aba BDR, aba ETF); aqui vale o que o ativo carrega.
+
+    ETF de Ibovespa/dividendos vira Ações Brasil, de S&P/global vira Exterior junto com os BDRs,
+    de títulos públicos vira Tesouro Direto e de cripto vira Cripto. O setor vem de setores.py;
+    sem setor, vale o "Tipo" da aba ETF da B3.
+    """
+    if p["classe"] == "BDRs (ações globais)":
+        return EXTERIOR
+    if p["classe"] != "ETFs":
+        return p["classe"]
+    s = setores.setor(p["ticker"], mapa) or ""
+    if s == "Renda fixa":
+        return "Tesouro Direto"
+    if s == "Cripto" or p.get("estrategia") == "Cripto":
+        return "Cripto"
+    if s == "Índice amplo (Brasil)":
+        return "Ações Brasil"
+    if s.startswith("Índice amplo") or p.get("estrategia") == "Renda Variável Global":
+        return EXTERIOR
+    return "Ações Brasil"
+
+
+def reclassificar(doc, mapa):
+    for p in doc["posicoes"]:
+        p["classe_b3"], p["classe"] = p["classe"], classe_economica(p, mapa)
+    return doc
 
 
 def carregar():
-    return [json.loads(p.read_text()) for p in sorted(DIR_MENSAL.glob("*.json"))]
+    mapa = setores.mapa()
+    return [reclassificar(json.loads(p.read_text()), mapa) for p in sorted(DIR_MENSAL.glob("*.json"))]
 
 
 def agrupar_rv(posicoes):
@@ -159,8 +199,48 @@ def calcular_mes(ant, cur, cdi_mes, classe_de, pendentes):
     return resumo(itens), {c: resumo(l) for c, l in por_classe.items()}, movimentos, avisos, ganho_ativo
 
 
+def carregar_alvo():
+    """Carteira ideal (dados/alvo.json, opcional): % de cada classe e, dentro dela, % de cada ativo."""
+    if not ALVO.exists():
+        return None, []
+    alvo = json.loads(ALVO.read_text())
+    return alvo, validar_alvo(alvo)
+
+
+def validar_alvo(alvo):
+    """Avisos sobre o alvo; levanta ValueError se a estrutura não for usável."""
+    classes = alvo.get("classes") if isinstance(alvo, dict) else None
+    if not isinstance(classes, dict) or not classes:
+        raise ValueError('o alvo precisa de "classes": {"<classe>": {"alvo": %, "ativos": {"TICKER": %}}}')
+    for c, v in classes.items():
+        nums = [v.get("alvo")] + list((v.get("ativos") or {}).values()) if isinstance(v, dict) else [None]
+        if not all(isinstance(n, (int, float)) and n >= 0 for n in nums):
+            raise ValueError(f"{c}: percentuais precisam ser números >= 0")
+    regras = alvo.get("regras") or {}
+    if not isinstance(regras, dict):
+        raise ValueError('"regras" precisa ser um objeto: {"max_ativo": %, "max_setor_classe": %, ...}')
+    for k, v in regras.items():
+        if k not in REGRAS:
+            raise ValueError(f"regra desconhecida \"{k}\" (use: {', '.join(REGRAS)})")
+        if not isinstance(v, (int, float)) or not 0 < v <= 100:
+            raise ValueError(f"regra {k}: precisa ser um % entre 0 e 100")
+    avisos = [f"alvo: classe desconhecida \"{c}\" (use: {', '.join(BENCH_CLASSE)})" for c in classes if c not in BENCH_CLASSE]
+    tot = sum(v.get("alvo", 0) for v in classes.values())
+    if abs(tot - 100) > 0.05:
+        avisos.append(f"alvo: as classes somam {tot:g}%, não 100% (o dashboard normaliza)")
+    for c, v in classes.items():
+        if v.get("ativos") and abs(sum(v["ativos"].values()) - 100) > 0.05:
+            avisos.append(f"alvo: os ativos de {c} somam {sum(v['ativos'].values()):g}%, não 100% (o dashboard normaliza)")
+    return avisos
+
+
+def tickers_do_alvo(alvo):
+    """Tickers citados no alvo (inclusive os que ainda não estão na carteira)."""
+    return [t for c in (alvo or {}).get("classes", {}).values() for t in (c.get("ativos") or {})]
+
+
 def compactar(p):
-    campos = ("id", "ticker", "nome", "classe", "estrategia", "instituicao", "quantidade", "preco", "valor",
+    campos = ("id", "ticker", "nome", "classe", "classe_b3", "estrategia", "instituicao", "quantidade", "preco", "valor",
               "emissor", "tipo_rf", "indexador", "vencimento", "aplicado", "liquido")
     return {k: p[k] for k in campos if p.get(k) is not None}
 
@@ -197,7 +277,16 @@ def main():
     for k, (q, c) in pendentes.items():
         if abs(q) > EPS:
             todos_avisos.append(f"{k[3:]}: {q:+g} unidades negociadas ainda não aparecem na posição (liquidação no próximo mês?)")
-    data = {"gerado_em": date.today().isoformat(), "meses": saida, "benchmarks": bench, "bench_classe": BENCH_CLASSE}
+    alvo, avisos_alvo = carregar_alvo()
+    todos_avisos += avisos_alvo
+    tickers = sorted({p["ticker"] for d in docs for p in d["posicoes"] if p["id"].startswith("RV:")} | set(tickers_do_alvo(alvo)))
+    m = setores.mapa()
+    setor = {t: s for t in tickers if (s := setores.setor(t, m))}
+    sem_setor = [t for t in tickers if t not in setor and any(p.get("ticker") == t and p["valor"] > 0 for p in docs[-1]["posicoes"])]
+    if sem_setor:
+        todos_avisos.append(f"sem setor (classifique em dados/setores.json): {', '.join(sem_setor)}")
+    data = {"gerado_em": date.today().isoformat(), "meses": saida, "benchmarks": bench, "bench_classe": BENCH_CLASSE,
+            "alvo": alvo, "alvo_avisos": avisos_alvo, "setores": setor, "historico": mercado.historico()}
     SAIDA.parent.mkdir(parents=True, exist_ok=True)
     SAIDA.write_text("window.DATA = " + json.dumps(data, ensure_ascii=False) + ";\n")
 
