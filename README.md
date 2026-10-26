@@ -5,7 +5,7 @@ Dashboard local da carteira a partir dos relatórios consolidados mensais da B3 
 ## Uso mensal
 
 1. Na B3 Área do Investidor, baixe o **relatório consolidado mensal em .xlsx** (fica em `~/Downloads`).
-2. No Claude Code, dentro desta pasta: `/atualizar-carteira`.
+2. No Claude Code, Cursor ou Codex, dentro desta pasta: skill `atualizar-carteira` (`/atualizar-carteira` no Claude Code).
 
 Manual:
 ```sh
