@@ -153,6 +153,13 @@ class Grupamento(unittest.TestCase):
         self.assertAlmostEqual(total["fluxo"], 1600)
         self.assertIn("desdobramento", avisos[0])
 
+    def test_classe_que_nasce_no_mes_usa_o_aporte_inteiro(self):
+        neg = [{"ticker": "VALE3", "instituicao": "XP", "inicio": None, "fim": None, "qtd_compra": 100, "qtd_venda": 0, "pm_compra": 10.0, "pm_venda": 0}]
+        vazio = {"posicoes": [], "proventos": [], "negociacoes": []}
+        total, classes, _, _, _ = gerar.calcular_mes(vazio, self.mes(100, 7.0, neg), 0.8, {"RV:VALE3": "Ações Brasil"}, {})
+        self.assertAlmostEqual(classes["Ações Brasil"]["rent"], -30)
+        self.assertAlmostEqual(total["rent"], -30)
+
     def test_transferencia_que_dobra_a_posicao_e_aporte(self):
         total, _, _, _, _ = gerar.calcular_mes(self.mes(100, 10.0), self.mes(300, 10.5), 0.8, {"RV:VALE3": "Ações Brasil"}, {})
         self.assertAlmostEqual(total["fluxo"], 2100)

@@ -6,6 +6,7 @@ Uso:
 Rentabilidade mensal (Dietz modificado):
     ganho   = patrimônio final - patrimônio inicial - aportes líquidos + proventos
     retorno = ganho / (patrimônio inicial + aportes líquidos / 2)
+    (sem patrimônio inicial, o denominador é o aporte inteiro)
 
 Aportes líquidos (fluxos) por tipo de ativo:
     - bolsa: aba Negociações (compras - vendas a preço médio)
@@ -193,7 +194,8 @@ def calcular_mes(ant, cur, cdi_mes, classe_de, pendentes):
         v1 = sum(i["v1"] for i in lista)
         f = sum(i["fluxo"] for i in lista)
         g = sum(i["ganho"] for i in lista)
-        base = v0 + f / 2
+        # sem saldo inicial (classe ou carteira que nasce no mês), "aporte no meio do mês" dobraria o retorno
+        base = v0 + f / 2 if v0 > 1 else f
         return {"inicial": round(v0, 2), "final": round(v1, 2), "fluxo": round(f, 2), "proventos": round(sum(i["prov"] for i in lista), 2),
                 "ganho": round(g, 2), "rent": round(g / base * 100, 4) if base > 1 else None}
 

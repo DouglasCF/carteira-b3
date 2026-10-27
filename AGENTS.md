@@ -13,7 +13,7 @@ Dashboard pessoal de carteira gerado a partir dos relatórios consolidados mensa
 ## Convenções de cálculo (não óbvias)
 
 - Mês = posição no último dia útil. O anual da B3 vira `AAAA-12`: é a base, sem rentabilidade própria, e os proventos dele são do ano inteiro.
-- Rentabilidade mensal: Dietz modificado, `ganho / (inicial + aportes/2)`. O período é o encadeamento dos meses.
+- Rentabilidade mensal: Dietz modificado, `ganho / (inicial + aportes/2)`; sem saldo inicial (classe que nasce no mês), `ganho / aportes`. O período é o encadeamento dos meses.
 - Classes econômicas: o `gerar.py` reclassifica pelo que o ativo carrega (`classe_economica`), enquanto o JSON mensal mantém a classe da B3 (`classe_b3`). BDRs e ETFs de S&P/global formam a classe "Exterior (BDRs e ETFs)". ETFs de Ibovespa/dividendos vão para Ações Brasil, ETFs de títulos públicos para Tesouro Direto, e ETFs de cripto para Cripto, que não tem índice próprio, então o resultado dela conta todo como alocação.
 - Ações, BDRs, ETFs e FIIs: os aportes vêm da aba Negociações e são reconhecidos quando a quantidade muda na posição (liquidação D+1/D+2: compras do fim do mês entram no mês seguinte).
 - CDB, LCA e Tesouro: a B3 não informa aplicações e resgates, que são deduzidos comparando os meses. Um título zerado com quantidade "-" significa que foi pago (vencimento ou FGC).

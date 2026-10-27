@@ -78,6 +78,9 @@ button[aria-pressed="true"] { background: var(--ink); color: var(--surface); bor
 .alerts .info .ic { background: var(--muted); }
 .alerts .good .ic { background: var(--good); }
 .alerts small { color: var(--ink-2); display:block; }
+.alerts .ajuste { display:block; margin-top: 2px; }
+.alerts details { margin-top: 4px; }
+.alerts summary { cursor: pointer; color: var(--muted); }
 .tbl-wrap { overflow: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { padding: 7px 8px; border-bottom: 1px solid var(--grid); text-align: left; white-space: nowrap; }
@@ -166,7 +169,7 @@ footer li { margin-bottom: 4px; }
   <section class="grid g-2">
     <div class="card">
       <h2>De onde veio o ganho</h2>
-      <p class="hint">Ganho em R$ de cada tipo de ativo, mês a mês (inclui proventos).</p>
+      <p class="hint" id="ganhoHint"></p>
       <div class="legend" id="lgGanho"></div>
       <div class="chart" style="height:280px"><canvas id="cGanho"></canvas></div>
     </div>
@@ -391,7 +394,8 @@ function endLabels(fmt) {
       ctx.font = '11px system-ui,-apple-system,"Segoe UI",sans-serif'; ctx.fillStyle = css("--ink-2"); ctx.textBaseline = "middle";
       chart.getDatasetMeta(0).data.forEach((bar, i) => {
         const v = chart.data.datasets[0].data[i]; const neg = v < 0;
-        ctx.textAlign = neg ? "right" : "left"; ctx.fillText(fmt(v), bar.x + (neg ? -6 : 6), bar.y);
+        // negativo: rótulo à direita do zero, para não cobrir o nome do ativo no eixo
+        ctx.textAlign = "left"; ctx.fillText(fmt(v), (neg ? bar.base : bar.x) + 6, bar.y);
       });
       ctx.restore();
     },
@@ -1226,16 +1230,28 @@ function initSim() {
 }
 
 // ---------------------------------------------------------------- ganho por classe
+// barras em R$ somam bem: em períodos longos, agrupa por trimestre ou ano para não virarem riscos
+function agruparMeses(meses) {
+  const [unidade, chave, rotulo] = meses.length > 36 ? ["ano", m => m.slice(0, 4), k => k]
+    : meses.length > 18 ? ["trimestre", m => `${m.slice(0, 4)}-${Math.ceil(m.slice(5) / 3)}`, k => `${k.slice(5)}T${k.slice(2, 4)}`]
+    : ["mês", m => m, mesLabel];
+  const g = [];
+  meses.forEach(m => { const k = chave(m.mes); if (g.at(-1)?.k !== k) g.push({ k, label: rotulo(k), meses: [] }); g.at(-1).meses.push(m); });
+  return { unidade, grupos: g };
+}
+
 function renderGanho(P) {
   const presentes = CLASSES.filter(c => P.meses.some(m => m.classes[c] && Math.abs(m.classes[c].ganho) > 0.5));
+  const { unidade, grupos } = agruparMeses(P.meses);
+  document.getElementById("ganhoHint").textContent = `Ganho em R$ de cada tipo de ativo, por ${unidade} (inclui proventos).`;
   legend("lgGanho", presentes.map(c => [c, corClasse(c)]));
   charts.push(new Chart(document.getElementById("cGanho"), {
     type: "bar",
-    data: { labels: P.meses.map(m => mesLabel(m.mes)), datasets: presentes.map(c => ({ label: c, data: P.meses.map(m => m.classes[c]?.ganho ?? 0), backgroundColor: corClasse(c), borderColor: css("--surface"), borderWidth: 1, borderSkipped: false, borderRadius: 2, barPercentage: 0.75 })) },
+    data: { labels: grupos.map(g => g.label), datasets: presentes.map(c => ({ label: c, data: grupos.map(g => soma(g.meses, m => m.classes[c]?.ganho ?? 0)), backgroundColor: corClasse(c), borderColor: css("--surface"), borderWidth: 1, borderSkipped: false, borderRadius: 2, barPercentage: 0.75 })) },
     options: {
       ...base(), interaction: { mode: "index", intersect: false },
       scales: { x: { ...eixoX(), stacked: true }, y: { ...eixoY(v => kbrl(v)), stacked: true, grid: { color: c => c.tick.value === 0 ? css("--axis") : css("--grid") } } },
-      plugins: { legend: { display: false }, tooltip: tip({ filter: c => Math.abs(c.raw) > 0.5, callbacks: { label: c => ` ${c.dataset.label}: ${brlS(c.raw)}`, footer: c => `Total: ${brlS(P.meses[c[0].dataIndex].resumo.ganho)}` } }) },
+      plugins: { legend: { display: false }, tooltip: tip({ filter: c => Math.abs(c.raw) > 0.5, callbacks: { label: c => ` ${c.dataset.label}: ${brlS(c.raw)}`, footer: c => `Total: ${brlS(soma(grupos[c[0].dataIndex].meses, m => m.resumo.ganho))}` } }) },
     },
   }));
 }
@@ -1326,7 +1342,7 @@ function renderContrib(P) {
     options: {
       ...base(), indexAxis: "y", layout: { padding: { right: 8 } },
       onClick: (_, els) => { if (els.length) { const r = rows[els[0].index]; setFiltro(r.classe, r.label); } },
-      scales: { x: { display: false, min: Math.min(0, ...rows.map(r => r.v)) * 1.9, max: Math.max(0, ...rows.map(r => r.v)) * 1.3 }, y: { grid: { display: false }, border: { display: false }, ticks: { color: css("--ink-2"), font: { size: 11 } } } },
+      scales: { x: { display: false, min: Math.min(0, ...rows.map(r => r.v)) * 1.05, max: Math.max(Math.max(0, ...rows.map(r => r.v)) * 1.3, -Math.min(0, ...rows.map(r => r.v)) * 0.6) }, y: { grid: { display: false }, border: { display: false }, ticks: { color: css("--ink-2"), font: { size: 11 } } } },
       plugins: { legend: { display: false }, tooltip: tip({ callbacks: { title: c => rows[c[0].dataIndex].label, label: c => ` ${brlS(c.raw)} · ${rows[c.dataIndex].classe}` } }) },
     },
     plugins: [endLabels(v => brlS(v))],
@@ -1339,13 +1355,15 @@ function renderProv(P) {
   const total = soma(P.meses, m => soma(m.proventos, p => p.valor));
   document.getElementById("provHint").textContent = `${brl(total)} no período, ` + tipos.map(t => `${t}: ${brl(soma(P.meses, m => soma(m.proventos.filter(p => p.tipo === t), p => p.valor)))}`).join(" · ");
   legend("lgProv", tipos.map((t, i) => [t, css(`--s${i + 1}`)]));
+  const { grupos } = agruparMeses(P.meses);
+  const provDe = (g, f = () => true) => soma(g.meses, m => soma(m.proventos.filter(f), p => p.valor));
   charts.push(new Chart(document.getElementById("cProv"), {
     type: "bar",
-    data: { labels: P.meses.map(m => mesLabel(m.mes)), datasets: tipos.map((t, i) => ({ label: t, data: P.meses.map(m => soma(m.proventos.filter(p => p.tipo === t), p => p.valor)), backgroundColor: css(`--s${i + 1}`), borderColor: css("--surface"), borderWidth: { top: 1 }, borderSkipped: false, borderRadius: 2, barPercentage: 0.7 })) },
+    data: { labels: grupos.map(g => g.label), datasets: tipos.map((t, i) => ({ label: t, data: grupos.map(g => provDe(g, p => p.tipo === t)), backgroundColor: css(`--s${i + 1}`), borderColor: css("--surface"), borderWidth: { top: 1 }, borderSkipped: false, borderRadius: 2, barPercentage: 0.7 })) },
     options: {
       ...base(), interaction: { mode: "index", intersect: false },
       scales: { x: { ...eixoX(), stacked: true }, y: { ...eixoY(v => kbrl(v)), stacked: true } },
-      plugins: { legend: { display: false }, tooltip: tip({ filter: c => c.raw > 0, callbacks: { label: c => ` ${c.dataset.label}: ${brl2(c.raw)}`, footer: c => `Total: ${brl2(soma(P.meses[c[0].dataIndex].proventos, p => p.valor))}` } }) },
+      plugins: { legend: { display: false }, tooltip: tip({ filter: c => c.raw > 0, callbacks: { label: c => ` ${c.dataset.label}: ${brl2(c.raw)}`, footer: c => `Total: ${brl2(provDe(grupos[c[0].dataIndex]))}` } }) },
     },
   }));
   const g = {};
@@ -1404,9 +1422,19 @@ function renderAlerts(P) {
   const rv = {};
   pos.filter(p => p.id.startsWith("RV:")).forEach(p => rv[p.ticker] = (rv[p.ticker] || 0) + p.valor);
   Object.entries(rv).filter(([, v]) => v / total > 0.05).sort((a, b) => b[1] - a[1]).forEach(([t, v]) => out.push(["info", "i", `${t} é ${pctAbs(v / total * 100)} da carteira`, brl(v)]));
-  const av = P.meses.flatMap(m => (m.avisos || []).map(a => `${mesLabel(m.mes)}: ${a}`));
-  if (av.length) out.push(["info", "i", `${av.length} ajuste(s) de cálculo no período`, av.join(" · ")]);
-  document.getElementById("alerts").innerHTML = out.length ? out.map(([c, ic, t, s]) => `<li class="${c}"><span class="ic" aria-hidden="true">${ic}</span><div><strong>${esc(t)}</strong><small>${esc(s)}</small></div></li>`).join("") : `<li class="info"><span class="ic">✓</span><div><strong>Nada a destacar</strong></div></li>`;
+  // ajustes de quantidade sem negociação: os 5 maiores em R$ à vista; desdobramentos (sem efeito no ganho),
+  // direitos de subscrição e frações ficam recolhidos
+  const av = P.meses.flatMap(m => (m.avisos || []).map(a => {
+    const v = a.match(/R\$ (-?[\d,.]+)/);
+    return { txt: `${mesLabel(m.mes)}: ${a.replace(/ \([^)]*\)/, "")}`, valor: v ? Math.abs(parseFloat(v[1].replace(/,/g, ""))) : 0 };
+  }));
+  if (av.length) {
+    const top = av.filter(a => a.valor >= 1000).sort((a, b) => b.valor - a.valor).slice(0, 5), resto = av.filter(a => !top.includes(a));
+    const linhas = l => l.map(a => `<span class="ajuste">${esc(a.txt)}</span>`).join("");
+    out.push(["info", "i", `${av.length} ajuste(s) de quantidade sem negociação no período`, null,
+      (top.length ? linhas(top) : "") + (resto.length ? `<details><summary>${top.length ? `+${resto.length} outros` : `Ver os ${resto.length}`} (desdobramentos, direitos de subscrição, frações)</summary>${linhas(resto)}</details>` : "")]);
+  }
+  document.getElementById("alerts").innerHTML = out.length ? out.map(([c, ic, t, s, html]) => `<li class="${c}"><span class="ic" aria-hidden="true">${ic}</span><div><strong>${esc(t)}</strong><small>${html ?? esc(s)}</small></div></li>`).join("") : `<li class="info"><span class="ic">✓</span><div><strong>Nada a destacar</strong></div></li>`;
 }
 
 // ---------------------------------------------------------------- posições
