@@ -134,5 +134,64 @@ class LeituraNomes(unittest.TestCase):
         self.assertEqual(b3.ticker_base("TAEE11"), "TAEE11")
 
 
+class Grupamento(unittest.TestCase):
+    def mes(self, q, preco, negociacoes=()):
+        return {"posicoes": [{"id": "RV:VALE3:XP", "ticker": "VALE3", "nome": "Vale", "classe": "Ações Brasil",
+                              "estrategia": "Renda Variável Brasil", "instituicao": "XP", "quantidade": q, "preco": preco, "valor": q * preco}],
+                "proventos": [], "negociacoes": list(negociacoes)}
+
+    def test_grupamento_com_preco_oscilando_nao_e_resgate(self):
+        # 10:1 com queda de 9% no mês
+        total, _, _, avisos, _ = gerar.calcular_mes(self.mes(3000, 2.0), self.mes(300, 18.2), 0.8, {"RV:VALE3": "Ações Brasil"}, {})
+        self.assertAlmostEqual(total["fluxo"], 0)
+        self.assertIn("grupamento", avisos[0])
+
+    def test_compra_antes_do_desdobramento_entra_no_fator(self):
+        # 50 + 20 comprados, desdobramento 20:1 → 1400; só a compra é aporte
+        neg = [{"ticker": "VALE3", "instituicao": "XP", "inicio": None, "fim": None, "qtd_compra": 20, "qtd_venda": 0, "pm_compra": 80.0, "pm_venda": 0}]
+        total, _, _, avisos, _ = gerar.calcular_mes(self.mes(50, 76.0), self.mes(1400, 3.6, neg), 0.8, {"RV:VALE3": "Ações Brasil"}, {})
+        self.assertAlmostEqual(total["fluxo"], 1600)
+        self.assertIn("desdobramento", avisos[0])
+
+    def test_transferencia_que_dobra_a_posicao_e_aporte(self):
+        total, _, _, _, _ = gerar.calcular_mes(self.mes(100, 10.0), self.mes(300, 10.5), 0.8, {"RV:VALE3": "Ações Brasil"}, {})
+        self.assertAlmostEqual(total["fluxo"], 2100)
+
+
+class LeituraEmprestimo(unittest.TestCase):
+    """Ações doadas em empréstimo somem da aba de posição e voltam na de empréstimos."""
+
+    def ler(self, abas):
+        import openpyxl
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+        for nome, linhas in abas.items():
+            ws = wb.create_sheet(nome)
+            for l in linhas:
+                ws.append(l)
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "x.xlsx"
+            wb.save(p)
+            return b3.ler(p)
+
+    def test_doado_soma_na_posicao(self):
+        acoes = [["Produto", "Instituição", "Código de Negociação", "Quantidade", "Preço de Fechamento", "Valor Atualizado"],
+                 ["WEGE3 - WEG S.A.", "XP INVESTIMENTOS CCTVM S/A", "WEGE3", 10, 40.0, 400.0]]
+        emp = [["Produto", "Instituição", "Natureza", "Quantidade", "Preço de Fechamento", "Valor Atualizado"],
+               ["WEGE3 - WEG S.A.", "XP INVESTIMENTOS CCTVM S/A", "Doador", 5, 40.0, 200.0],
+               ["ITUB4 - ITAU UNIBANCO", "XP INVESTIMENTOS CCTVM S/A", "Doador", 3, 30.0, 90.0],
+               ["PETR4 - PETROBRAS", "XP INVESTIMENTOS CCTVM S/A", "Tomador", 7, 25.0, 175.0]]
+        pos = {p["ticker"]: p for p in self.ler({"Posição - Ações": acoes, "Posição - Empréstimos": emp})["posicoes"]}
+        self.assertEqual((pos["WEGE3"]["quantidade"], pos["WEGE3"]["valor"], pos["WEGE3"]["emprestado"]), (15, 600, 200))
+        self.assertEqual((pos["ITUB4"]["quantidade"], pos["ITUB4"]["classe"]), (3, "Ações Brasil"))
+        self.assertNotIn("PETR4", pos)
+
+    def test_reembolso_no_formato_de_extrato(self):
+        reemb = [["Entrada/Saída", "Data", "Movimentação", "Produto", "Instituição", "Quantidade", "Preço unitário", "Valor da Operação"],
+                 ["Credito", "10/03/2026", "Reembolso", "WEGE3 - WEG S.A.", "XP INVESTIMENTOS CCTVM S/A", 0, "-", 12.5]]
+        prov = self.ler({"Reembolsos de Empréstimo": reemb})["proventos"]
+        self.assertEqual(prov, [{"ticker": "WEGE3", "tipo": "Reembolso", "valor": 12.5, "data": "2026-03-10", "instituicao": "XP"}])
+
+
 if __name__ == "__main__":
     unittest.main()

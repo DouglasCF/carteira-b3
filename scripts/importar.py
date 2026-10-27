@@ -79,7 +79,7 @@ def normalizar_todos():
             if aba == "Posição - Renda Fixa":
                 soma = sum(p["valor"] for p in dados["posicoes"] if p["id"].startswith("RF:"))
             else:
-                soma = sum(p["valor"] for p in dados["posicoes"] if p["classe"] == por_aba[aba])
+                soma = sum(p["valor"] - p.get("emprestado", 0) for p in dados["posicoes"] if p["classe"] == por_aba[aba])
             if abs(soma - total) > 1:
                 avisos.append(f"{mes} {aba}: soma lida {soma:.2f} ≠ total da B3 {total:.2f}")
         resumo.append({

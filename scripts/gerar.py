@@ -150,7 +150,12 @@ def calcular_mes(ant, cur, cdi_mes, classe_de, pendentes):
             if abs(sobra) > EPS:
                 pu1 = v1 / q1 if q1 > EPS else 0.0
                 pu0 = v0 / q0 if q0 > EPS else 0.0
-                desdobro = q0 > EPS and q1 > EPS and not (0.83 < q1 / q0 < 1.2) and abs((q1 / q0) * (pu1 / pu0) - 1) < 0.05
+                # o preço oscila no mês; em fator 2× ou mais, transferência não explica o preço por unidade mudar junto.
+                # o fator vale também para o que foi negociado antes da data do evento
+                base = q0 + liquidado
+                r = q1 / base if q0 > EPS and base > EPS else 0.0
+                folga = 0.25 if r >= 2 or r <= 0.5 else 0.05
+                desdobro = q0 > EPS and q1 > EPS and not (0.83 < r < 1.2) and abs(r * (pu1 / pu0) - 1) < folga
                 if desdobro:
                     avisos.append(f"{nome}: quantidade {q0:g} → {q1:g} com preço ajustado na mesma proporção; tratado como desdobramento/grupamento (sem aporte)")
                 elif q0 < EPS:

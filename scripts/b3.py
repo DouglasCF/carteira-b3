@@ -127,6 +127,27 @@ def ler(path):
                 "valor": _num(r["Valor Atualizado"]),
             })
 
+    # ações doadas em empréstimo saem da aba de posição, mas continuam sendo do investidor
+    if "Posição - Empréstimos" in abas:
+        por_id = {p["id"]: p for p in posicoes}
+        for r in _rows(abas["Posição - Empréstimos"]):
+            if r.get("Natureza") != "Doador":
+                continue
+            t = ticker_base(r["Produto"].split(" - ", 1)[0].strip())
+            inst = _inst(r["Instituição"])
+            p = por_id.get(f"RV:{t}:{inst}")
+            if p is None:
+                igual = next((x for x in posicoes if x.get("ticker") == t), {})  # mesmo ativo em outra corretora
+                p = por_id[f"RV:{t}:{inst}"] = {
+                    "id": f"RV:{t}:{inst}", "ticker": t, "nome": r["Produto"].split(" - ", 1)[-1].strip(),
+                    "classe": igual.get("classe", "Ações Brasil"), "estrategia": igual.get("estrategia", "Renda Variável Brasil"),
+                    "instituicao": inst, "quantidade": 0.0, "preco": _num(r["Preço de Fechamento"]), "valor": 0.0,
+                }
+                posicoes.append(p)
+            p["quantidade"] += _num(r["Quantidade"])
+            p["valor"] += _num(r["Valor Atualizado"])
+            p["emprestado"] = p.get("emprestado", 0.0) + _num(r["Valor Atualizado"])
+
     if "Posição - Renda Fixa" in abas:
         totais["Posição - Renda Fixa"] = _total_declarado(abas["Posição - Renda Fixa"])
         for r in _rows(abas["Posição - Renda Fixa"]):
@@ -172,6 +193,8 @@ def ler(path):
     for aba in ("Proventos Recebidos", "Reembolsos de Empréstimo"):
         if aba in abas:
             for r in _rows(abas[aba]):
+                if "Movimentação" in r:  # reembolso no mensal vem como extrato: Entrada/Saída, Data, Movimentação...
+                    r = {**r, "Tipo de Evento": r["Movimentação"], "Valor líquido": r["Valor da Operação"], "Pagamento": r["Data"]}
                 proventos.append({
                     "ticker": ticker_base(r["Produto"].split(" - ", 1)[0].strip()),
                     "tipo": r["Tipo de Evento"],
